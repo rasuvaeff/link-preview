@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Documented and exampled the two things the package leaves to the application: `examples/pinned_client.php` (a PSR-18 client over Guzzle that pins the connection to the addresses checked by `UrlPolicy`, tested against `localhost` and the metadata address) and `examples/json_ld_processor.php` (a `JsonLdReader` on top of `rasuvaeff/json-ld`; same previews as the built-in reader on 14 real-page blocks, and it also reads inline contexts and aliases).
 - `UserAgentMap::unfurler()` (and `UserAgentMap::UNFURLER`): the unfurler name `Twitterbot/1.0` for every host with per-host overrides; checked live that VK and championat.com refuse the default name.
 - `UrlPolicy`: http(s)-only, port, public-IP and IDN policy with CIDR allowlist, no DNS resolution.
 - `Fetcher`: PSR-18 fetching with its own redirect loop (policy on every hop), redirect limit, between-hop budget, response size and content-type limits, per-host `UserAgentMap`.

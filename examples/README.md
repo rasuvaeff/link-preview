@@ -16,4 +16,6 @@ docker run --rm -v "$PWD":/app -w /app composer:2 php examples/parse_html.php
 | `adapters_oembed.php` | YouTube, TikTok, Twitter/X, Twitch from recorded oEmbed answers | No |
 | `adapters_pages.php` | GitHub, Telegram, VK (page tags) and Wikipedia, Rutube (APIs) from recorded answers | No |
 | `adapters_tokens.php` | Instagram: the missing-token failure, then a configured token | No |
+| `json_ld_processor.php` | A JSON-LD 1.1 processor behind `JsonLdReader` (needs `rasuvaeff/json-ld`; says so and exits without it) | No |
+| `pinned_client.php` | A PSR-18 client with DNS pinning over Guzzle, refusing hosts with non-public addresses | No |
 | `live.php` | A real fetch with Guzzle, only when `LINK_PREVIEW_URL` is set | Yes (optional) |

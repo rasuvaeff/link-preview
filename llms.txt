@@ -12,7 +12,8 @@ composer require guzzlehttp/guzzle   # any PSR-18 client + PSR-17 request factor
 - PHP 8.3+, `declare(strict_types=1)`, ext dom/libxml/mbstring/intl/ctype/filter
 - Everything returns `Rasuvaeff\Result\Result` with an enum failure; nothing throws on bad network input
 - The PSR-18 client MUST NOT follow redirects (Guzzle `allow_redirects => false`): `Fetcher` follows them itself and applies `UrlPolicy` to every hop
-- No DNS pinning is possible with PSR-18; timeouts belong to the client; mitigate rebinding with a trusted resolving egress proxy
+- No DNS pinning inside the package (PSR-18 has no hook); timeouts belong to the client; close rebinding with a trusted resolving egress proxy or with `examples/pinned_client.php` (Guzzle, CURLOPT_RESOLVE to the addresses UrlPolicy checked)
+- JSON-LD: the built-in `SimpleJsonLdReader` reads schema.org-context blocks only; `examples/json_ld_processor.php` is a `JsonLdReader` over `rasuvaeff/json-ld` that also handles inline contexts and aliases
 - Output URLs are absolute http(s) only; text is plain (escape it when rendering)
 - Source priority per field: site adapter > oEmbed (discovered) > JSON-LD > OpenGraph > Twitter Cards > HTML
 - Adapter tokens (Instagram, Facebook required; Twitter optional) are constructor args, sent as Authorization headers to the API host only, never in URLs; no token = AdapterFailure::MissingToken, no request

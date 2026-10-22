@@ -63,6 +63,10 @@ Each field is taken from the first source that has it, in this order: **site ada
 
 oEmbed discovery makes one extra request: the endpoint is an address chosen by the page, so it is fetched through the same `Fetcher` - same `UrlPolicy`, same redirect checks - and can never reach what the original URL could not. JSON-LD is read by a small built-in reader (`SimpleJsonLdReader`, behind the `JsonLdReader` interface so a full processor can replace it): only schema.org contexts are understood, a remote or inline `@context` is never fetched and the block is skipped.
 
+#### A full JSON-LD processor
+
+The built-in reader is a convenience, not a processor: it understands pages whose `@context` is a schema.org URL and skips every other block (an inline context, aliases such as `"title": "headline"`, compact IRIs). When that matters, implement `JsonLdReader` on top of [`rasuvaeff/json-ld`](https://github.com/rasuvaeff/json-ld), a JSON-LD 1.1 processor that does no I/O of its own: it expands the block and loads a remote context only through a loader you give it. [`examples/json_ld_processor.php`](examples/json_ld_processor.php) is a complete reader (about 100 lines, runnable): a loader that answers for schema.org and refuses everything else, the expansion, and the mapping of the expanded schema.org IRIs back to the short names the extractor reads. Pass it as `new JsonLdExtractor(new ProcessorJsonLdReader())` in `extractors:`. On 14 JSON-LD blocks collected from real pages (Wikipedia, YouTube, BBC, The New York Times, IMDb, Kommersant, Championat and others) it gives exactly the same previews as the built-in reader, and it also reads the blocks the built-in reader skips.
+
 | Field | OpenGraph | Twitter Cards | HTML fallback |
 |---|---|---|---|
 | `title` | `og:title` | `twitter:title` | `<title>` |
@@ -205,7 +209,7 @@ A link preview fetches a URL chosen by a user from inside your network. What the
 
 What it cannot do, because PSR-18 does not give it the means:
 
-- **No DNS pinning.** The policy never resolves names; a name that resolves to an internal address passes, and an attacker can rebind a name between the check and the connection. Close this in the transport: send the client's traffic through a trusted resolving proxy (an egress proxy that refuses internal destinations, e.g. Smokescreen), or give the client a resolver/connection hook of its own that applies the same ranges to the connected address.
+- **No DNS pinning in the package.** The policy never resolves names; a name that resolves to an internal address passes, and an attacker can rebind a name between the check and the connection. Close this in the transport: either send the client's traffic through a trusted resolving proxy (an egress proxy that refuses internal destinations, e.g. Smokescreen), or pin the connection yourself. [`examples/pinned_client.php`](examples/pinned_client.php) is a ready PSR-18 client over Guzzle that does the second: it resolves the host, checks every address with the same `UrlPolicy`, and passes the checked addresses to cURL (`CURLOPT_RESOLVE`), so the connection can only go where the check looked. A host with any non-public address is refused before a socket is opened; redirects are left to the `Fetcher`. (It is a recipe and not a class of the package because it needs Guzzle with the cURL handler; copy it into your application.)
 - **The client must not follow redirects** (`allow_redirects => false` for Guzzle, `max_redirects => 0` for Symfony). A redirect followed inside the client skips the policy.
 - **Timeouts belong to the client.** PSR-18 has none; configure connect and read timeouts on the client. `chainBudgetSeconds` is checked between hops only and cannot interrupt a request in flight.
 - **Body size** is checked on the body the client returns; a client that buffers has already read it. Set a limit on the client too.
@@ -227,6 +231,8 @@ documented public API.
 | `adapters_oembed.php` | YouTube, TikTok, Twitter/X, Twitch from recorded oEmbed answers | No |
 | `adapters_pages.php` | GitHub, Telegram, VK (page tags) and Wikipedia, Rutube (APIs) from recorded answers | No |
 | `adapters_tokens.php` | Instagram: the missing-token failure, then a configured token | No |
+| `json_ld_processor.php` | A JSON-LD 1.1 processor behind `JsonLdReader` (needs `rasuvaeff/json-ld`; says so and exits without it) | No |
+| `pinned_client.php` | A PSR-18 client with DNS pinning over Guzzle, refusing hosts with non-public addresses | No |
 | `live.php` | A real fetch with Guzzle, only when `LINK_PREVIEW_URL` is set | Yes (optional) |
 
 ## Development
