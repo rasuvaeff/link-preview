@@ -50,6 +50,7 @@ make release-check
 ## Invariants & gotchas
 
 - `ext-intl` is required (IDN hosts); the stock `composer:2` image lacks it, so use `make image`.
+- JSON answers are parsed with `Extract\Schemas` (`rasuvaeff/schema`, which brings `property-testing-core` into runtime - accepted by the owner); never echo input values into diagnostics.
 - Adapter fixtures in `tests/fixtures/adapters/` are written from documented formats, not recorded; `bin/record-preview-corpus --check` must stay green and `--record` needs `--live`.
 - Mutation gate `minMsi` is 90; PageCorpusTest fixtures in `tests/fixtures/` record page intent, edit them deliberately.
 - Code: `declare(strict_types=1)`, `final readonly class`, `#[\Override]`,

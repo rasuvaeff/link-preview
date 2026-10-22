@@ -20,7 +20,7 @@ Russian version: [README.ru.md](README.ru.md).
 
 - PHP 8.3-8.5 (8.6 is checked in CI as experimental) with `dom`, `libxml`, `mbstring`, `intl`, `ctype`, `filter`
 - `psr/http-client`, `psr/http-factory`, `psr/http-message`
-- `rasuvaeff/result`
+- `rasuvaeff/result`, `rasuvaeff/schema` (reads the JSON answers of oEmbed, Wikipedia and Rutube; pulls `rasuvaeff/property-testing-core` in at runtime)
 - A PSR-18 client and PSR-17 request factory of your choice (Guzzle, Symfony HttpClient + Nyholm PSR-7, ...)
 
 ## Installation
@@ -166,6 +166,8 @@ $provider = new PreviewProvider(
 );
 ```
 
+JSON answers (oEmbed, Wikipedia summary, Rutube video) are read through `rasuvaeff/schema` schemas (`Extract\Schemas`): open objects, listed fields optional or `null`, a field of the wrong type makes the answer unreadable (`AdapterFailure::InvalidResponse`) and `AdapterContext::diagnostics()` says where (`oEmbed $.title: ...`) without echoing a value. GitHub, Telegram and VK are read from HTML, and JSON-LD is open-ended, so neither uses a schema.
+
 Tokens are constructor arguments (`#[\SensitiveParameter]`), travel as an `Authorization: Bearer` header to the API host only (a redirect to another host drops them) and never appear in a URL, a failure or an exception. Without a token, Instagram and Facebook answer `AdapterFailure::MissingToken` without making any request. `new AdapterRegistry()` turns adapters off; implement `Adapter` to add a site.
 
 The fixtures behind the adapter tests are in `tests/fixtures/adapters/`: they are written from the services' documented response formats, not live recordings. `bin/record-preview-corpus --check` re-parses every committed entry (no network); `bin/record-preview-corpus --record=<name> --live` refreshes one entry's files from the real service, and `LINK_PREVIEW_LIVE=1 vendor/bin/testo --suite=Integration` compares the real services with what the code expects.
@@ -183,6 +185,7 @@ The fixtures behind the adapter tests are in `tests/fixtures/adapters/`: they ar
 | `Fetch\UserAgentMap` | Host -> `User-Agent` |
 | `Html\PageDocument` | Read-only DOM view: `title()`, `meta()`, `links()`, `images()`, `language()`, `baseHref()` |
 | `Extract\Extractor`, `OEmbedExtractor`, `JsonLdExtractor`, `OpenGraphExtractor`, `TwitterCardsExtractor`, `HtmlFallbackExtractor` | Sources; return `Result<Metadata, ExtractFailure>` |
+| `Extract\Schemas` | `rasuvaeff/schema` schemas of the JSON answers |
 | `Extract\JsonLdReader`, `SimpleJsonLdReader`, `JsonLdFailure` | Replaceable JSON-LD reader |
 | `Adapter\Adapter`, `AdapterRegistry`, `AdapterContext`, `AdapterFailure` | Site adapters and their registry; eleven built in |
 | `Extract\Metadata` | What one source knows (all fields optional) |

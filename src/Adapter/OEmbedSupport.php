@@ -43,9 +43,15 @@ final readonly class OEmbedSupport
             return Result::err(error: AdapterFailure::Unavailable);
         }
 
-        $metadata = OEmbedResponse::metadata(json: $response->unwrap()->body, baseUrl: $endpoint);
+        $metadata = OEmbedResponse::parse(json: $response->unwrap()->body, baseUrl: $endpoint);
 
-        return $metadata === null ? Result::err(error: AdapterFailure::InvalidResponse) : Result::ok(value: $metadata);
+        if ($metadata->isErr()) {
+            $context->note('oEmbed ' . (string) $metadata->error());
+
+            return Result::err(error: AdapterFailure::InvalidResponse);
+        }
+
+        return Result::ok(value: $metadata->unwrap());
     }
 
     /**

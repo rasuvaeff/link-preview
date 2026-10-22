@@ -109,6 +109,11 @@ No network (tests, stored HTML): `$provider->fromHtml(html: $html, pageUrl: $url
 
 ## Pitfalls
 
+- JSON answers are parsed through `Extract\Schemas` (`rasuvaeff/schema`); a wrong-typed field
+  makes the answer unreadable (`InvalidResponse`), the reason (`$.title: ...`, no values) is in
+  `AdapterContext::diagnostics()`. Extend the schema, don't add `isset` chains; in tests use
+  `Schemas::oEmbed()->arbitrary()` for generated answers.
+
 - Fields merge per field by priority: site adapter > oEmbed (discovery makes
   an extra request) > JSON-LD > OpenGraph > Twitter Cards > HTML. A custom
   `extractors:` list replaces the default; put the highest priority first.

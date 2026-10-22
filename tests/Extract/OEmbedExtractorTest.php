@@ -116,19 +116,19 @@ final class OEmbedExtractorTest
 
     public function aPhotoUsesItsUrlAsTheImage(): void
     {
-        $metadata = OEmbedResponse::metadata('{"type":"photo","url":"https://cdn.example.net/p.jpg","title":"P"}', 'https://example.com/oembed')?->image;
+        $metadata = OEmbedResponse::parse('{"type":"photo","url":"https://cdn.example.net/p.jpg","title":"P"}', 'https://example.com/oembed')->value()?->image;
 
         Assert::same($metadata, 'https://cdn.example.net/p.jpg');
     }
 
     public function aNonPhotoDoesNotUseUrlAsTheImage(): void
     {
-        Assert::null(OEmbedResponse::metadata('{"type":"rich","url":"https://cdn.example.net/p.jpg","title":"P"}', 'https://example.com/oembed')?->image);
+        Assert::null(OEmbedResponse::parse('{"type":"rich","url":"https://cdn.example.net/p.jpg","title":"P"}', 'https://example.com/oembed')->value()?->image);
     }
 
     public function theEmbedIsTheIframeSourceOnly(): void
     {
-        $embed = static fn(string $html): ?string => OEmbedResponse::metadata((string) json_encode(['title' => 'T', 'html' => $html]), 'https://example.com/o')?->embedUrl;
+        $embed = static fn(string $html): ?string => OEmbedResponse::parse((string) json_encode(['title' => 'T', 'html' => $html]), 'https://example.com/o')->value()?->embedUrl;
 
         Assert::same($embed('<iframe width="1" src="https://p.example.net/e?a=1&amp;b=2"></iframe>'), 'https://p.example.net/e?a=1&b=2');
         Assert::same($embed("<iframe\n src='/rel'></iframe>"), 'https://example.com/rel');

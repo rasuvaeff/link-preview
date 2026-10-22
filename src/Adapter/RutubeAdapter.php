@@ -6,6 +6,7 @@ namespace Rasuvaeff\LinkPreview\Adapter;
 
 use Rasuvaeff\LinkPreview\Extract\Json;
 use Rasuvaeff\LinkPreview\Extract\Metadata;
+use Rasuvaeff\LinkPreview\Extract\Schemas;
 use Rasuvaeff\LinkPreview\Extract\Values;
 use Rasuvaeff\Result\Result;
 
@@ -36,12 +37,16 @@ final readonly class RutubeAdapter implements Adapter
             return Result::err(error: AdapterFailure::Unavailable);
         }
 
-        $data = Json::object(Json::decode($response->unwrap()->body));
-        $author = Json::object($data['author'] ?? null);
+        $parsed = Schemas::parse(Schemas::rutubeVideo(), $response->unwrap()->body);
 
-        if ($data === null || Json::string($data['title'] ?? null) === null) {
+        if ($parsed->isErr()) {
+            $context->note('Rutube video ' . (string) $parsed->error());
+
             return Result::err(error: AdapterFailure::InvalidResponse);
         }
+
+        $data = $parsed->unwrap();
+        $author = Json::object($data['author'] ?? null);
 
         return Result::ok(value: new Metadata(
             title: Json::string($data['title'] ?? null),

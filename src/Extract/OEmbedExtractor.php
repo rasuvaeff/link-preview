@@ -42,8 +42,8 @@ final readonly class OEmbedExtractor implements Extractor
         }
 
         $page = $fetched->unwrap();
-        $metadata = OEmbedResponse::metadata(json: $page->body, baseUrl: $page->url);
+        $metadata = OEmbedResponse::parse(json: $page->body, baseUrl: $page->url);
 
-        return $metadata === null ? Result::err(error: ExtractFailure::InvalidData) : Result::ok(value: $metadata);
+        return $metadata->isErr() ? Result::err(error: ExtractFailure::InvalidData) : Result::ok(value: $metadata->unwrap());
     }
 }

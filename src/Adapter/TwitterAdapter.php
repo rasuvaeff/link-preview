@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Rasuvaeff\LinkPreview\Adapter;
 
+use Rasuvaeff\LinkPreview\Extract\Json;
 use Rasuvaeff\LinkPreview\Extract\Metadata;
+use Rasuvaeff\LinkPreview\Extract\OEmbedResponse;
 use Rasuvaeff\Result\Result;
 
 /**
@@ -45,19 +47,21 @@ final readonly class TwitterAdapter implements Adapter
         }
 
         $body = $response->unwrap()->body;
-        $service = \Rasuvaeff\LinkPreview\Extract\OEmbedResponse::metadata(json: $body, baseUrl: self::ENDPOINT);
+        $service = OEmbedResponse::parse(json: $body, baseUrl: self::ENDPOINT);
 
-        if ($service === null) {
+        if ($service->isErr()) {
+            $context->note('oEmbed ' . (string) $service->error());
+
             return Result::err(error: AdapterFailure::InvalidResponse);
         }
 
-        return Result::ok(value: OEmbedSupport::with(new Metadata(description: $this->text($body)), $service));
+        return Result::ok(value: OEmbedSupport::with(new Metadata(description: $this->text($body)), $service->unwrap()));
     }
 
     private function text(string $json): ?string
     {
-        $data = \Rasuvaeff\LinkPreview\Extract\Json::object(\Rasuvaeff\LinkPreview\Extract\Json::decode($json));
-        $html = \Rasuvaeff\LinkPreview\Extract\Json::string($data['html'] ?? null);
+        $data = Json::object(Json::decode($json));
+        $html = Json::string($data['html'] ?? null);
 
         if ($html === null || preg_match('~<p\b[^>]*>(.*?)</p>~is', $html, $matches) !== 1) {
             return null;

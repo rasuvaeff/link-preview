@@ -20,7 +20,7 @@ English version: [README.md](README.md).
 
 - PHP 8.3-8.5 (8.6 проверяется в CI как экспериментальная) с `dom`, `libxml`, `mbstring`, `intl`, `ctype`, `filter`
 - `psr/http-client`, `psr/http-factory`, `psr/http-message`
-- `rasuvaeff/result`
+- `rasuvaeff/result`, `rasuvaeff/schema` (разбирает JSON-ответы oEmbed, Wikipedia и Rutube; тянет `rasuvaeff/property-testing-core` в runtime)
 - PSR-18 клиент и PSR-17 фабрика запросов на ваш выбор (Guzzle, Symfony HttpClient + Nyholm PSR-7, ...)
 
 ## Установка
@@ -166,6 +166,8 @@ $provider = new PreviewProvider(
 );
 ```
 
+JSON-ответы (oEmbed, Wikipedia summary, Rutube video) разбираются схемами `rasuvaeff/schema` (`Extract\Schemas`): открытые объекты, перечисленные поля необязательны или `null`, поле неверного типа делает ответ нечитаемым (`AdapterFailure::InvalidResponse`), а `AdapterContext::diagnostics()` называет место (`oEmbed $.title: ...`), не повторяя значения. GitHub, Telegram и VK читаются из HTML, а JSON-LD открытой формы, поэтому схема там не применяется.
+
 Токены - аргументы конструктора (`#[\SensitiveParameter]`), уходят заголовком `Authorization: Bearer` только на хост API (редирект на другой хост их отбрасывает) и никогда не попадают в URL, отказ или исключение. Без токена Instagram и Facebook отвечают `AdapterFailure::MissingToken`, не делая ни одного запроса. `new AdapterRegistry()` выключает адаптеры; свой сайт добавляется реализацией `Adapter`.
 
 Фикстуры тестов адаптеров лежат в `tests/fixtures/adapters/`: они написаны по документированным форматам ответов сервисов, это не живые записи. `bin/record-preview-corpus --check` заново разбирает каждую закоммиченную запись (без сети); `bin/record-preview-corpus --record=<name> --live` обновляет файлы одной записи с реального сервиса, а `LINK_PREVIEW_LIVE=1 vendor/bin/testo --suite=Integration` сверяет реальные сервисы с ожиданиями кода.
@@ -183,6 +185,7 @@ $provider = new PreviewProvider(
 | `Fetch\UserAgentMap` | Хост -> `User-Agent` |
 | `Html\PageDocument` | DOM только для чтения: `title()`, `meta()`, `links()`, `images()`, `language()`, `baseHref()` |
 | `Extract\Extractor`, `OEmbedExtractor`, `JsonLdExtractor`, `OpenGraphExtractor`, `TwitterCardsExtractor`, `HtmlFallbackExtractor` | Источники; возвращают `Result<Metadata, ExtractFailure>` |
+| `Extract\Schemas` | Схемы `rasuvaeff/schema` для JSON-ответов |
 | `Extract\JsonLdReader`, `SimpleJsonLdReader`, `JsonLdFailure` | Заменяемый читатель JSON-LD |
 | `Adapter\Adapter`, `AdapterRegistry`, `AdapterContext`, `AdapterFailure` | Адаптеры сайтов и их реестр; одиннадцать встроенных |
 | `Extract\Metadata` | Что знает один источник (все поля необязательны) |

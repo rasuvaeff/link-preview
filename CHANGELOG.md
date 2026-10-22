@@ -16,5 +16,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `JsonLdExtractor` with a replaceable `JsonLdReader` (built-in `SimpleJsonLdReader`, schema.org contexts only, nothing remote is ever loaded).
 - `Fetcher::fetchJson()` and `Fetcher::check()`; custom request headers go to the first host only.
 - Site adapters behind `Adapter` / `AdapterRegistry`: YouTube, TikTok, Twitter/X, Twitch, Wikipedia, GitHub, Instagram, Facebook, Telegram, VK, Rutube. Hosts are matched label by label; Instagram and Facebook require an access token and fail with `MissingToken` without one.
+- JSON answers of oEmbed, Wikipedia and Rutube are parsed with `rasuvaeff/schema` (`Extract\Schemas`); `AdapterContext::diagnostics()` reports unreadable shapes without values.
 - `PageInfo::$embedUrl`; `PreviewFailure::MissingToken`.
 - Recorded adapter corpus in `tests/fixtures/adapters/`, `bin/record-preview-corpus`, env-gated live integration suite.

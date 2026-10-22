@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Rasuvaeff\LinkPreview\Extract;
 
 use Rasuvaeff\LinkPreview\Url\UrlResolver;
+use Rasuvaeff\Result\Result;
 
 /**
  * Reads an oEmbed JSON response (oembed.com): `title`, `author_name`,
@@ -19,15 +20,29 @@ final readonly class OEmbedResponse
 
     /**
      * @param non-empty-string $baseUrl what relative or protocol-relative references resolve against
+     *
+     * @return Result<Metadata, string> the metadata, or a diagnostic from the schema ({@see Schemas::parse()}),
+     *         or `$: nothing to show` for an answer with none of the fields that matter
      */
-    public static function metadata(string $json, string $baseUrl): ?Metadata
+    public static function parse(string $json, string $baseUrl): Result
     {
-        $data = Json::object(Json::decode($json));
+        $data = Schemas::parse(Schemas::oEmbed(), $json);
 
-        if ($data === null) {
-            return null;
+        if ($data->isErr()) {
+            return Result::err(error: (string) $data->error());
         }
 
+        $metadata = self::fromData($data->unwrap(), $baseUrl);
+
+        return $metadata === null ? Result::err(error: '$: nothing to show') : Result::ok(value: $metadata);
+    }
+
+    /**
+     * @param array<string, mixed> $data an answer parsed by {@see Schemas::oEmbed()}
+     * @param non-empty-string $baseUrl
+     */
+    public static function fromData(array $data, string $baseUrl): ?Metadata
+    {
         $type = Json::string($data['type'] ?? null);
         $image = Json::string($data['thumbnail_url'] ?? null);
 

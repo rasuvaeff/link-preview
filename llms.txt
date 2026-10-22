@@ -113,6 +113,9 @@ AdapterRegistry::standard(
 );
 ```
 
+JSON answers are parsed by `Extract\Schemas` (rasuvaeff/schema: `oEmbed()`, `wikipediaSummary()`, `rutubeVideo()`; `->arbitrary()` generates valid ones for tests);
+a wrong-typed field = AdapterFailure::InvalidResponse + `$context->diagnostics()` (paths only, no values).
+
 YouTube, TikTok, Twitter/X, Twitch (oEmbed), Wikipedia (REST summary), GitHub (OG, gists), Instagram, Facebook (Graph API oEmbed),
 Telegram (OG + widget), VK (OG + video_ext.php), Rutube (video API). Hosts match by labels: www./m./subdomains yes,
 `youtube.com.evil.example` no. Custom site: implement `Adapter` (`domains(): list<string>`, `preview(string $url, AdapterContext $context): Result<Metadata, AdapterFailure>`)

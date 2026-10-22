@@ -6,6 +6,7 @@ namespace Rasuvaeff\LinkPreview\Adapter;
 
 use Rasuvaeff\LinkPreview\Extract\Json;
 use Rasuvaeff\LinkPreview\Extract\Metadata;
+use Rasuvaeff\LinkPreview\Extract\Schemas;
 use Rasuvaeff\LinkPreview\Extract\Values;
 use Rasuvaeff\Result\Result;
 
@@ -41,10 +42,19 @@ final readonly class WikipediaAdapter implements Adapter
             return Result::err(error: AdapterFailure::Unavailable);
         }
 
-        $data = Json::object(Json::decode($response->unwrap()->body));
+        $parsed = Schemas::parse(Schemas::wikipediaSummary(), $response->unwrap()->body);
+
+        if ($parsed->isErr()) {
+            $context->note('Wikipedia summary ' . (string) $parsed->error());
+
+            return Result::err(error: AdapterFailure::InvalidResponse);
+        }
+
+        $data = $parsed->unwrap();
         $thumbnail = Json::object($data['thumbnail'] ?? null);
         $content = Json::object(Json::object($data['content_urls'] ?? null)['desktop'] ?? null);
-        $metadata = new Metadata(
+
+        return Result::ok(value: new Metadata(
             url: OEmbedSupport::absolute(Json::string($content['page'] ?? null) ?? ''),
             title: Json::string($data['title'] ?? null),
             description: Json::string($data['extract'] ?? null) ?? Json::string($data['description'] ?? null),
@@ -52,10 +62,6 @@ final readonly class WikipediaAdapter implements Adapter
             siteName: 'Wikipedia',
             language: Values::language(Json::string($data['lang'] ?? null)),
             type: 'article',
-        );
-
-        return $data === null || Json::string($data['title'] ?? null) === null
-            ? Result::err(error: AdapterFailure::InvalidResponse)
-            : Result::ok(value: $metadata);
+        ));
     }
 }
