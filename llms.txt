@@ -1,0 +1,26 @@
+# {{PACKAGE_KEBAB}}
+
+Install:
+
+```
+composer require rasuvaeff/{{PACKAGE_KEBAB}}
+```
+
+## Rules
+
+- PHP 8.3+, `declare(strict_types=1)`
+- Immutable by default (`final readonly class`)
+- <!-- Add package-specific rules here -->
+
+## API
+
+<!-- For each public class, provide a self-contained example.
+The goal: an LLM can use the package correctly from this file alone. -->
+
+```php
+use Rasuvaeff\{{PACKAGE_PASCAL}}\SomeClass;
+
+$object = new SomeClass(
+    param: 'value',
+);
+```
