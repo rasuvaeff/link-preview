@@ -39,6 +39,7 @@ final readonly class PageDocument
         $utf8 = str_replace("\0", '', self::toUtf8($html, $charset));
 
         if (trim($utf8) !== '') {
+            $utf8 = self::withUtf8Meta($utf8);
             $previous = libxml_use_internal_errors(true);
 
             try {
@@ -242,6 +243,18 @@ final readonly class PageDocument
     private static function dimension(string $value): ?int
     {
         return preg_match('/\A\s*(\d{1,6})(?:px)?\s*\z/', $value, $matches) === 1 ? max(0, (int) $matches[1]) : null;
+    }
+
+    /**
+     * The text is UTF-8 by now, whatever its `<meta>` still claims; some libxml
+     * versions let a stale `charset` re-decode it, so every claim is rewritten.
+     */
+    private static function withUtf8Meta(string $utf8): string
+    {
+        $head = mb_strcut($utf8, 0, self::SNIFF_BYTES, 'UTF-8');
+        $rewritten = preg_replace('/(<meta\s[^>]*?charset\s*=\s*["\']?\s*)[A-Za-z0-9._:-]+/i', '${1}utf-8', $head);
+
+        return ($rewritten ?? $head) . substr($utf8, \strlen($head));
     }
 
     private static function toUtf8(string $html, ?string $transportCharset): string
