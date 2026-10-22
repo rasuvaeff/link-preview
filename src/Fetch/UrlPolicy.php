@@ -124,7 +124,10 @@ final readonly class UrlPolicy
             $normalized .= '?' . $parts['query'];
         }
 
-        return Result::ok(value: $normalized);
+        /** @var Result<non-empty-string, UrlRejection> $result */
+        $result = Result::ok(value: $normalized);
+
+        return $result;
     }
 
     /**

@@ -11,7 +11,7 @@ final readonly class Cidr
 {
     /**
      * @param non-empty-string $network packed address, 4 or 16 bytes
-     * @param int<0, 128> $prefix
+     * @param int<0, max> $prefix
      */
     private function __construct(
         private string $network,
@@ -43,7 +43,7 @@ final readonly class Cidr
             return null;
         }
 
-        return new self(network: $packed, prefix: (int) $length);
+        return new self(network: $packed, prefix: max(0, (int) $length));
     }
 
     /**

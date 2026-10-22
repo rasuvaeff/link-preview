@@ -10,6 +10,8 @@ namespace Rasuvaeff\LinkPreview\Url;
  * without credentials and without a fragment.
  *
  * @internal
+ *
+ * @psalm-type UrlParts = array{scheme?: string, host?: string, port?: int, user?: string, pass?: string, path?: string, query?: string, fragment?: string}
  */
 final readonly class UrlResolver
 {
@@ -79,7 +81,7 @@ final readonly class UrlResolver
     }
 
     /**
-     * @return array{scheme?: string, host?: string, port?: int, user?: string, pass?: string, path?: string, query?: string}|null
+     * @return UrlParts|null
      */
     private static function parse(string $url): ?array
     {
@@ -101,7 +103,7 @@ final readonly class UrlResolver
     }
 
     /**
-     * @param array{scheme?: string, host?: string, port?: int, user?: string, pass?: string, path?: string, query?: string}|null $parts
+     * @param UrlParts|null $parts
      *
      * @return non-empty-string|null
      */

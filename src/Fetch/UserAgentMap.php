@@ -20,7 +20,7 @@ final readonly class UserAgentMap
     private array $byHost;
 
     /**
-     * @param array<string, string> $byHost
+     * @param array<array-key, string> $byHost
      */
     public function __construct(
         array $byHost = [],

@@ -39,8 +39,6 @@ final readonly class Fetcher
     private const array MEDIA_TYPES = ['text/html', 'application/xhtml+xml'];
 
     /**
-     * @param int<0, max> $maxRedirects
-     * @param int<1, max> $maxBodyBytes
      * @param float|null $chainBudgetSeconds wall-clock budget of the whole redirect chain
      */
     public function __construct(
@@ -70,7 +68,7 @@ final readonly class Fetcher
      */
     public function fetch(string $url): Result
     {
-        $startedAt = hrtime(as_number: true);
+        $startedAt = (int) hrtime(as_number: true);
         $redirects = 0;
 
         while (true) {
@@ -113,13 +111,13 @@ final readonly class Fetcher
         }
     }
 
-    private function budgetSpent(float|int $startedAt): bool
+    private function budgetSpent(int $startedAt): bool
     {
         if ($this->chainBudgetSeconds === null) {
             return false;
         }
 
-        return (hrtime(as_number: true) - $startedAt) / 1e9 >= $this->chainBudgetSeconds;
+        return (float) (hrtime(as_number: true) - $startedAt) / 1e9 >= $this->chainBudgetSeconds;
     }
 
     private function send(string $url): ?ResponseInterface
