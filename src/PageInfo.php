@@ -25,6 +25,7 @@ use Rasuvaeff\LinkPreview\Url\UrlResolver;
  *     authorName: string|null,
  *     publishedTime: string|null,
  *     type: string|null,
+ *     embedUrl: string|null,
  * }
  */
 final readonly class PageInfo
@@ -33,6 +34,7 @@ final readonly class PageInfo
      * @param non-empty-string $url absolute http(s) URL of the page
      * @param string|null $image absolute http(s) URL
      * @param string|null $favicon absolute http(s) URL
+     * @param string|null $embedUrl absolute http(s) URL of an embeddable player
      */
     public function __construct(
         public string $url,
@@ -45,8 +47,9 @@ final readonly class PageInfo
         public ?string $authorName = null,
         public ?DateTimeImmutable $publishedTime = null,
         public ?string $type = null,
+        public ?string $embedUrl = null,
     ) {
-        foreach (['url' => $url, 'image' => $image, 'favicon' => $favicon] as $field => $value) {
+        foreach (['url' => $url, 'image' => $image, 'favicon' => $favicon, 'embedUrl' => $embedUrl] as $field => $value) {
             if ($value !== null && !UrlResolver::isAbsoluteHttp($value)) {
                 throw new InvalidArgumentException(\sprintf('Page %s must be an absolute http(s) URL', $field));
             }
@@ -69,6 +72,7 @@ final readonly class PageInfo
             'authorName' => $this->authorName,
             'publishedTime' => $this->publishedTime?->format(DateTimeInterface::ATOM),
             'type' => $this->type,
+            'embedUrl' => $this->embedUrl,
         ];
     }
 }

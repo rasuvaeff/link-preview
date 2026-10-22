@@ -1,0 +1,245 @@
+[
+    {
+        "name": "youtube",
+        "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        "options": [],
+        "responses": {
+            "https://www.youtube.com/oembed?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DdQw4w9WgXcQ&format=json": {
+                "file": "youtube/oembed.json",
+                "type": "application/json"
+            }
+        },
+        "expected": {
+            "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "title": "Never Gonna Give You Up (Official Video)",
+            "image": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+            "siteName": "YouTube",
+            "authorName": "Rick Astley",
+            "type": "video",
+            "embedUrl": "https://www.youtube.com/embed/dQw4w9WgXcQ"
+        }
+    },
+    {
+        "name": "tiktok",
+        "url": "https://www.tiktok.com/@scout2015/video/6718335390845095173",
+        "options": [],
+        "responses": {
+            "https://www.tiktok.com/oembed?url=https%3A%2F%2Fwww.tiktok.com%2F%40scout2015%2Fvideo%2F6718335390845095173": {
+                "file": "tiktok/oembed.json",
+                "type": "application/json"
+            }
+        },
+        "expected": {
+            "url": "https://www.tiktok.com/@scout2015/video/6718335390845095173",
+            "title": "Funny cat compilation",
+            "image": "https://p16-sign.tiktokcdn-us.com/obj/tos-useast5/cat.jpeg",
+            "siteName": "TikTok",
+            "authorName": "Scout",
+            "type": "video"
+        }
+    },
+    {
+        "name": "twitter",
+        "url": "https://x.com/jack/status/20",
+        "options": [],
+        "responses": {
+            "https://publish.twitter.com/oembed?url=https%3A%2F%2Ftwitter.com%2Fjack%2Fstatus%2F20&omit_script=1&dnt=true": {
+                "file": "twitter/oembed.json",
+                "type": "application/json"
+            }
+        },
+        "expected": {
+            "url": "https://x.com/jack/status/20",
+            "description": "just setting up my twttr & more second line",
+            "siteName": "Twitter",
+            "authorName": "jack",
+            "type": "rich"
+        }
+    },
+    {
+        "name": "twitch",
+        "url": "https://www.twitch.tv/shroud",
+        "options": {
+            "twitchParents": [
+                "example.com"
+            ]
+        },
+        "responses": {
+            "https://api.twitch.tv/v4/oembed?url=https%3A%2F%2Fwww.twitch.tv%2Fshroud": {
+                "file": "twitch/oembed.json",
+                "type": "application/json"
+            }
+        },
+        "expected": {
+            "url": "https://www.twitch.tv/shroud",
+            "title": "Late night stream",
+            "image": "https://static-cdn.jtvnw.net/previews-ttv/live_user_shroud-640x360.jpg",
+            "siteName": "Twitch",
+            "authorName": "shroud",
+            "type": "video",
+            "embedUrl": "https://player.twitch.tv/?channel=shroud&parent=example.com"
+        }
+    },
+    {
+        "name": "wikipedia",
+        "url": "https://en.m.wikipedia.org/wiki/HTTP",
+        "options": [],
+        "responses": {
+            "https://en.wikipedia.org/api/rest_v1/page/summary/HTTP": {
+                "file": "wikipedia/summary.json",
+                "type": "application/json"
+            }
+        },
+        "expected": {
+            "url": "https://en.wikipedia.org/wiki/HTTP",
+            "title": "Hypertext Transfer Protocol",
+            "description": "The Hypertext Transfer Protocol (HTTP) is an application layer protocol in the Internet protocol suite model for distributed, collaborative, hypermedia information systems.",
+            "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c9/HTTP_logo.svg/320px-HTTP_logo.png",
+            "siteName": "Wikipedia",
+            "language": "en",
+            "type": "article"
+        }
+    },
+    {
+        "name": "github",
+        "url": "https://github.com/rasuvaeff/result",
+        "options": [],
+        "responses": {
+            "https://github.com/rasuvaeff/result": {
+                "file": "github/repo.html",
+                "type": "text/html; charset=utf-8"
+            }
+        },
+        "expected": {
+            "url": "https://github.com/rasuvaeff/result",
+            "title": "rasuvaeff/result: Typed Result and Option primitives for PHP",
+            "description": "Typed Result and Option primitives for PHP. Contribute to rasuvaeff/result development by creating an account on GitHub.",
+            "image": "https://opengraph.githubassets.com/0b1c2d/rasuvaeff/result",
+            "favicon": "https://github.githubassets.com/favicons/favicon.svg",
+            "siteName": "GitHub",
+            "language": "en",
+            "type": "object"
+        }
+    },
+    {
+        "name": "github-gist",
+        "url": "https://gist.github.com/octocat/6cad326836d38bd3a7ae",
+        "options": [],
+        "responses": {
+            "https://gist.github.com/octocat/6cad326836d38bd3a7ae": {
+                "file": "github/gist.html",
+                "type": "text/html; charset=utf-8"
+            }
+        },
+        "expected": {
+            "url": "https://gist.github.com/octocat/6cad326836d38bd3a7ae",
+            "title": "Example gist",
+            "description": "A tiny snippet",
+            "image": "https://github.githubassets.com/images/modules/gists/gist-og-image.png",
+            "siteName": "GitHub Gist",
+            "language": "en"
+        }
+    },
+    {
+        "name": "instagram",
+        "url": "https://www.instagram.com/p/CxYz123AbC/",
+        "options": {
+            "instagramToken": "test-token"
+        },
+        "responses": {
+            "https://graph.facebook.com/v21.0/instagram_oembed?url=https%3A%2F%2Fwww.instagram.com%2Fp%2FCxYz123AbC%2F&omit_script=true": {
+                "file": "instagram/oembed.json",
+                "type": "application/json"
+            }
+        },
+        "expected": {
+            "url": "https://www.instagram.com/p/CxYz123AbC/",
+            "title": "A photo from the wild",
+            "image": "https://scontent.cdninstagram.com/v/t51.2885-15/photo.jpg",
+            "siteName": "Instagram",
+            "authorName": "natgeo",
+            "type": "rich"
+        }
+    },
+    {
+        "name": "facebook",
+        "url": "https://www.facebook.com/natgeo/posts/123456789",
+        "options": {
+            "facebookToken": "test-token"
+        },
+        "responses": {
+            "https://graph.facebook.com/v21.0/oembed_post?url=https%3A%2F%2Fwww.facebook.com%2Fnatgeo%2Fposts%2F123456789&omit_script=true": {
+                "file": "facebook/oembed.json",
+                "type": "application/json"
+            }
+        },
+        "expected": {
+            "url": "https://www.facebook.com/natgeo/posts/123456789",
+            "siteName": "Facebook",
+            "authorName": "National Geographic",
+            "type": "rich"
+        }
+    },
+    {
+        "name": "telegram",
+        "url": "https://t.me/durov/123",
+        "options": [],
+        "responses": {
+            "https://t.me/durov/123": {
+                "file": "telegram/post.html",
+                "type": "text/html; charset=utf-8"
+            }
+        },
+        "expected": {
+            "url": "https://t.me/durov/123",
+            "title": "Pavel Durov",
+            "description": "The post text goes here.",
+            "image": "https://cdn4.cdn-telegram.org/file/post.jpg",
+            "siteName": "Telegram",
+            "embedUrl": "https://t.me/durov/123?embed=1&mode=tme"
+        }
+    },
+    {
+        "name": "vk",
+        "url": "https://vk.com/video-22822305_456239018",
+        "options": [],
+        "responses": {
+            "https://vk.com/video-22822305_456239018": {
+                "file": "vk/video.html",
+                "type": "text/html; charset=utf-8"
+            }
+        },
+        "expected": {
+            "url": "https://vk.com/video-22822305_456239018",
+            "title": "Закат над морем",
+            "description": "Съёмка с дрона, 4K",
+            "image": "https://sun9-1.userapi.com/c1/preview.jpg",
+            "siteName": "VK",
+            "language": "ru-RU",
+            "type": "video.other",
+            "embedUrl": "https://vk.com/video_ext.php?oid=-22822305&id=456239018"
+        }
+    },
+    {
+        "name": "rutube",
+        "url": "https://rutube.ru/video/5ac7c1f0a1b2c3d4e5f60718293a4b5c/",
+        "options": [],
+        "responses": {
+            "https://rutube.ru/api/video/5ac7c1f0a1b2c3d4e5f60718293a4b5c/?format=json": {
+                "file": "rutube/video.json",
+                "type": "application/json"
+            }
+        },
+        "expected": {
+            "url": "https://rutube.ru/video/5ac7c1f0a1b2c3d4e5f60718293a4b5c/",
+            "title": "Видео про котов",
+            "description": "Смешные коты",
+            "image": "https://pic.rutubelist.ru/video/ab/cd/cats.jpg",
+            "siteName": "Rutube",
+            "authorName": "Котоканал",
+            "publishedTime": "2026-09-30T10:15:00+00:00",
+            "type": "video",
+            "embedUrl": "https://rutube.ru/play/embed/5ac7c1f0a1b2c3d4e5f60718293a4b5c"
+        }
+    }
+]

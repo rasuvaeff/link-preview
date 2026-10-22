@@ -1,0 +1,88 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Keeps the adapter corpus (tests/fixtures/adapters/) honest.
+ *
+ *   bin/record-preview-corpus --check            every committed entry still parses into the expected PageInfo
+ *   bin/record-preview-corpus --record=NAME --live
+ *                                                 fetch the entry's real URLs and overwrite its response files
+ *
+ * `--check` never touches the network. `--record` does, and refuses to run without `--live`;
+ * it rewrites only the files of the named entry and never edits `expected`: that is the
+ * intent of the page, to be reviewed and changed by hand.
+ */
+
+use GuzzleHttp\Client;
+use GuzzleHttp\Psr7\HttpFactory;
+use Rasuvaeff\LinkPreview\Fetch\Fetcher;
+use Rasuvaeff\LinkPreview\Tests\Support\AdapterCorpus;
+
+require dirname(__DIR__) . '/vendor/autoload.php';
+
+$arguments = \array_slice($argv, 1);
+$directory = dirname(__DIR__) . '/tests/fixtures/adapters';
+
+if (in_array('--check', $arguments, true)) {
+    $failed = 0;
+
+    foreach (AdapterCorpus::entries() as $entry) {
+        $outcome = AdapterCorpus::run($entry);
+        $ok = $outcome['preview'] === AdapterCorpus::expected($entry);
+        $failed += $ok ? 0 : 1;
+        fwrite($ok ? STDOUT : STDERR, sprintf("%-4s %s\n", $ok ? 'ok' : 'FAIL', $entry['name']));
+
+        if (!$ok) {
+            fwrite(STDERR, '     got: ' . json_encode($outcome['preview'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n");
+        }
+    }
+
+    exit($failed === 0 ? 0 : 1);
+}
+
+foreach ($arguments as $argument) {
+    if (!str_starts_with($argument, '--record=')) {
+        continue;
+    }
+
+    if (!in_array('--live', $arguments, true)) {
+        fwrite(STDERR, "--record fetches real pages: add --live to confirm\n");
+        exit(2);
+    }
+
+    $name = substr($argument, strlen('--record='));
+
+    foreach (AdapterCorpus::entries() as $entry) {
+        if ($entry['name'] !== $name) {
+            continue;
+        }
+
+        $fetcher = new Fetcher(
+            client: new Client(['allow_redirects' => false, 'http_errors' => false, 'timeout' => 10.0]),
+            requestFactory: new HttpFactory(),
+        );
+
+        foreach ($entry['responses'] as $url => $response) {
+            $page = str_contains($response['type'], 'json') ? $fetcher->fetchJson(url: $url) : $fetcher->fetch(url: $url);
+
+            if ($page->isErr()) {
+                fwrite(STDERR, sprintf("skip %s: %s\n", $url, $page->error()?->value));
+
+                continue;
+            }
+
+            file_put_contents($directory . '/' . $response['file'], $page->unwrap()->body);
+            fwrite(STDOUT, sprintf("wrote %s\n", $response['file']));
+        }
+
+        exit(0);
+    }
+
+    fwrite(STDERR, "unknown entry: $name\n");
+    exit(2);
+}
+
+fwrite(STDERR, "usage: bin/record-preview-corpus --check | --record=NAME --live\n");
+exit(2);

@@ -12,6 +12,7 @@ use Rasuvaeff\LinkPreview\Fetch\Fetcher;
 use Rasuvaeff\LinkPreview\Fetch\FetchFailure;
 use Rasuvaeff\LinkPreview\Fetch\UrlPolicy;
 use Rasuvaeff\LinkPreview\Fetch\UserAgentMap;
+use Rasuvaeff\LinkPreview\Tests\Support\Adapters;
 use Rasuvaeff\LinkPreview\Tests\Support\Http;
 use Rasuvaeff\PropertyTesting\Classify;
 use Rasuvaeff\PropertyTesting\Gen;
@@ -428,6 +429,77 @@ final class FetcherTest
         yield 'one redirect, none allowed' => [1, 0];
         yield 'at the default limit' => [5, 5];
         yield 'one past the default limit' => [6, 5];
+    }
+
+    public function fetchesJson(): void
+    {
+        $client = Http::client([
+            'https://api.example.com/x' => new Response(200, ['Content-Type' => 'application/json; charset=utf-8'], '{"a":1}'),
+            'https://api.example.com/y' => new Response(200, ['Content-Type' => 'application/vnd.api+json'], '{}'),
+        ]);
+
+        $fetcher = $this->fetcher($client);
+
+        Assert::same($fetcher->fetchJson(url: 'https://api.example.com/x')->unwrap()->body, '{"a":1}');
+        Assert::same($fetcher->fetchJson(url: 'https://api.example.com/y')->unwrap()->contentType, 'application/vnd.api+json');
+        Assert::same(Http::requests($client)[0]->getHeaderLine('Accept'), 'application/json');
+    }
+
+    #[DataProvider('notJsonProvider')]
+    public function jsonFetchRefusesOtherTypes(string $contentType): void
+    {
+        $client = Http::client(['https://api.example.com/x' => new Response(200, ['Content-Type' => $contentType], '<p>')]);
+
+        Assert::same($this->fetcher($client)->fetchJson(url: 'https://api.example.com/x')->error(), FetchFailure::NotHtml);
+    }
+
+    public static function notJsonProvider(): iterable
+    {
+        yield 'html' => ['text/html'];
+        yield 'plain' => ['text/plain'];
+        yield 'json look-alike' => ['application/jsonp'];
+        yield 'json inside a parameter' => ['text/plain; x=application/json'];
+    }
+
+    public function htmlFetchRefusesJson(): void
+    {
+        $client = Http::client(['https://api.example.com/x' => Adapters::json('{}')]);
+
+        Assert::same($this->fetcher($client)->fetch(url: 'https://api.example.com/x')->error(), FetchFailure::NotHtml);
+    }
+
+    public function jsonFetchObeysThePolicyOnEveryHop(): void
+    {
+        $client = Http::client([
+            'https://api.example.com/x' => Http::redirect('http://169.254.169.254/latest/meta-data/'),
+        ]);
+
+        Assert::same($this->fetcher($client)->fetchJson(url: 'https://api.example.com/x')->error(), FetchFailure::PolicyRejected);
+        Assert::same(Http::requestedUrls($client), ['https://api.example.com/x']);
+        Assert::same($this->fetcher($client)->fetchJson(url: 'http://127.0.0.1/api')->error(), FetchFailure::PolicyRejected);
+    }
+
+    public function customHeadersGoToTheFirstHostOnly(): void
+    {
+        $client = Http::client([
+            'https://api.example.com/x' => Http::redirect('/y'),
+            'https://api.example.com/y' => Http::redirect('https://elsewhere.example.net/z'),
+            'https://elsewhere.example.net/z' => Http::redirect('https://api.example.com/w'),
+            'https://api.example.com/w' => Adapters::json('{}'),
+        ]);
+
+        $this->fetcher($client)->fetchJson(url: 'https://api.example.com/x', headers: ['Authorization' => 'Bearer secret']);
+
+        $sent = array_map(static fn($request): string => $request->getHeaderLine('Authorization'), Http::requests($client));
+        Assert::same($sent, ['Bearer secret', 'Bearer secret', '', 'Bearer secret']);
+    }
+
+    public function checkReturnsTheNormalisedUrl(): void
+    {
+        $fetcher = $this->fetcher(Http::client([]));
+
+        Assert::same($fetcher->check(url: 'HTTPS://Example.COM:443/a#f')->value(), 'https://example.com/a');
+        Assert::same($fetcher->check(url: 'http://127.0.0.1/')->error(), \Rasuvaeff\LinkPreview\Fetch\UrlRejection::PrivateAddress);
     }
 
     private function fetcher(

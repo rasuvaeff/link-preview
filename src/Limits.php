@@ -53,6 +53,7 @@ final readonly class Limits
             authorName: $this->text($info->authorName, $this->authorNameLength),
             publishedTime: $info->publishedTime,
             type: $info->type,
+            embedUrl: $this->imageUrl($info->embedUrl),
         );
     }
 

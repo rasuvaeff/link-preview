@@ -21,6 +21,8 @@ enum PreviewFailure: string
     case HttpStatus = 'http_status';
     case NotHtml = 'not_html';
     case TooLarge = 'too_large';
+    /** the site's adapter needs an access token that was not configured, and the page itself was unavailable */
+    case MissingToken = 'missing_token';
     /** the page was fetched but no extractor found anything in it */
     case EmptyPage = 'empty_page';
 

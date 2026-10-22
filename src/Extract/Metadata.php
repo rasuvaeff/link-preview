@@ -18,6 +18,7 @@ final readonly class Metadata
      * @param non-empty-string|null $url
      * @param non-empty-string|null $image
      * @param non-empty-string|null $favicon
+     * @param non-empty-string|null $embedUrl absolute http(s) URL of an embeddable player
      */
     public function __construct(
         public ?string $url = null,
@@ -30,6 +31,7 @@ final readonly class Metadata
         public ?string $authorName = null,
         public ?DateTimeImmutable $publishedTime = null,
         public ?string $type = null,
+        public ?string $embedUrl = null,
     ) {}
 
     public function isEmpty(): bool
@@ -43,6 +45,7 @@ final readonly class Metadata
             && $this->language === null
             && $this->authorName === null
             && $this->publishedTime === null
-            && $this->type === null;
+            && $this->type === null
+            && $this->embedUrl === null;
     }
 }

@@ -11,7 +11,7 @@ final readonly class FetchedPage
 {
     /**
      * @param non-empty-string $url the URL the body came from, after redirects
-     * @param non-empty-string $contentType media type without parameters, lower-case
+     * @param string $contentType media type without parameters, lower-case
      * @param int<0, max> $redirects number of redirects followed
      */
     public function __construct(

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Plain title</title>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://example.com/#website",
+      "name": "Example News",
+      "url": "https://example.com/"
+    },
+    {
+      "@type": "NewsArticle",
+      "headline": "The headline",
+      "description": "Article description",
+      "image": {"@type": "ImageObject", "url": "https://example.com/img/hero.jpg"},
+      "url": "https://example.com/news/a",
+      "author": [{"@type": "Person", "name": "Jane Doe"}],
+      "publisher": {"@type": "Organization", "name": "Example News"},
+      "datePublished": "2026-10-01T12:30:00+03:00",
+      "inLanguage": "en_GB"
+    }
+  ]
+}
+</script>
+</head>
+<body></body>
+</html>

@@ -18,6 +18,7 @@ enum FetchFailure: string
     case BudgetExceeded = 'budget_exceeded';
     /** a status that is neither a followable redirect nor 2xx */
     case HttpStatus = 'http_status';
+    /** the response is not of the media type asked for (HTML for pages, JSON for APIs) */
     case NotHtml = 'not_html';
     case TooLarge = 'too_large';
 }

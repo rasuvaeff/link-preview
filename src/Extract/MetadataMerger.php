@@ -32,6 +32,7 @@ final readonly class MetadataMerger
                 authorName: $merged->authorName ?? $source->authorName,
                 publishedTime: $merged->publishedTime ?? $source->publishedTime,
                 type: $merged->type ?? $source->type,
+                embedUrl: $merged->embedUrl ?? $source->embedUrl,
             );
         }
 

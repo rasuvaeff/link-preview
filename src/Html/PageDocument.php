@@ -39,11 +39,10 @@ final readonly class PageDocument
         $utf8 = str_replace("\0", '', self::toUtf8($html, $charset));
 
         if (trim($utf8) !== '') {
-            $ascii = mb_encode_numericentity($utf8, [0x80, 0x10FFFF, 0, 0x1FFFFF], 'UTF-8');
             $previous = libxml_use_internal_errors(true);
 
             try {
-                $document->loadHTML($ascii, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
+                $document->loadHTML('<?xml encoding="UTF-8"?>' . $utf8, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
             } finally {
                 // switching the handling off also empties libxml's error buffer
                 libxml_use_internal_errors($previous);
@@ -120,6 +119,52 @@ final readonly class PageDocument
         }
 
         return $values;
+    }
+
+    /**
+     * Raw text of every `<script type="...">` of the given type, as written.
+     * It is data to be parsed by the caller, never executed.
+     *
+     * @return list<string>
+     */
+    public function scripts(string $type): array
+    {
+        $type = strtolower($type);
+        $bodies = [];
+
+        foreach ($this->elements('//script[@type]') as $script) {
+            if (strtolower(trim($script->getAttribute('type'))) === $type && trim($script->textContent) !== '') {
+                $bodies[] = $script->textContent;
+            }
+        }
+
+        return $bodies;
+    }
+
+    /**
+     * `href` of every `<link rel="alternate" type="...">` of the given type.
+     *
+     * @return list<string>
+     */
+    public function alternates(string $type): array
+    {
+        $type = strtolower($type);
+        $hrefs = [];
+
+        foreach ($this->elements('//link[@href][@rel][@type]') as $link) {
+            $tokens = preg_split('/\s+/', strtolower(trim($link->getAttribute('rel'))), -1, PREG_SPLIT_NO_EMPTY);
+            $href = trim($link->getAttribute('href'));
+
+            if (
+                $href !== ''
+                && strtolower(trim($link->getAttribute('type'))) === $type
+                && \in_array('alternate', $tokens === false ? [] : $tokens, true)
+            ) {
+                $hrefs[] = $href;
+            }
+        }
+
+        return $hrefs;
     }
 
     /**

@@ -41,6 +41,7 @@ final class PageCorpusTest
             'authorName' => null,
             'publishedTime' => null,
             'type' => null,
+            'embedUrl' => null,
         ], $expected));
     }
 

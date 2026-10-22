@@ -36,7 +36,11 @@ final readonly class Fetcher
 {
     private const array REDIRECTS = [301, 302, 303, 307, 308];
 
-    private const array MEDIA_TYPES = ['text/html', 'application/xhtml+xml'];
+    private const array HTML_TYPES = ['text/html', 'application/xhtml+xml'];
+
+    private const string HTML_ACCEPT = 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.1';
+
+    private const string JSON_ACCEPT = 'application/json';
 
     /**
      * @param float|null $chainBudgetSeconds wall-clock budget of the whole redirect chain
@@ -64,12 +68,52 @@ final readonly class Fetcher
     }
 
     /**
+     * The URL as it would be requested, or why the policy refuses it.
+     *
+     * @return Result<non-empty-string, UrlRejection>
+     */
+    public function check(string $url): Result
+    {
+        return $this->policy->check(url: $url);
+    }
+
+    /**
+     * Fetches an HTML page (`text/html` or `application/xhtml+xml`).
+     *
      * @return Result<FetchedPage, FetchFailure>
      */
     public function fetch(string $url): Result
     {
+        return $this->get($url, json: false, headers: []);
+    }
+
+    /**
+     * Fetches a JSON document (`application/json` or any `+json` type) under
+     * exactly the same policy, redirect and size rules as a page.
+     *
+     * `$headers` (an API token, for instance) are sent to the host of the
+     * first URL only: a redirect to another host drops them, so a credential
+     * cannot be handed to a third party by a `Location` header.
+     *
+     * @param array<string, string> $headers
+     *
+     * @return Result<FetchedPage, FetchFailure>
+     */
+    public function fetchJson(string $url, #[\SensitiveParameter] array $headers = []): Result
+    {
+        return $this->get($url, json: true, headers: $headers);
+    }
+
+    /**
+     * @param array<string, string> $headers
+     *
+     * @return Result<FetchedPage, FetchFailure>
+     */
+    private function get(string $url, bool $json, array $headers): Result
+    {
         $startedAt = (int) hrtime(as_number: true);
         $redirects = 0;
+        $origin = null;
 
         while (true) {
             $checked = $this->policy->check(url: $url);
@@ -79,12 +123,15 @@ final readonly class Fetcher
             }
 
             $url = $checked->unwrap();
+            $host = parse_url($url, PHP_URL_HOST);
+            $host = \is_string($host) ? $host : '';
+            $origin ??= $host;
 
             if ($redirects > 0 && $this->budgetSpent($startedAt)) {
                 return Result::err(error: FetchFailure::BudgetExceeded);
             }
 
-            $response = $this->send($url);
+            $response = $this->send($url, $host, $json, $host === $origin ? $headers : []);
 
             if ($response === null) {
                 return Result::err(error: FetchFailure::Network);
@@ -93,7 +140,7 @@ final readonly class Fetcher
             $status = $response->getStatusCode();
 
             if (!\in_array($status, self::REDIRECTS, true)) {
-                return $this->page($url, $response, $redirects);
+                return $this->page($url, $response, $redirects, $json);
             }
 
             if ($redirects >= $this->maxRedirects) {
@@ -120,14 +167,19 @@ final readonly class Fetcher
         return (float) (hrtime(as_number: true) - $startedAt) / 1e9 >= $this->chainBudgetSeconds;
     }
 
-    private function send(string $url): ?ResponseInterface
+    /**
+     * @param array<string, string> $headers
+     */
+    private function send(string $url, string $host, bool $json, array $headers): ?ResponseInterface
     {
-        $host = parse_url($url, PHP_URL_HOST);
-
         $request = $this->requestFactory
             ->createRequest(method: 'GET', uri: $url)
-            ->withHeader('User-Agent', $this->userAgents->forHost(\is_string($host) ? $host : ''))
-            ->withHeader('Accept', 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.1');
+            ->withHeader('User-Agent', $this->userAgents->forHost($host))
+            ->withHeader('Accept', $json ? self::JSON_ACCEPT : self::HTML_ACCEPT);
+
+        foreach ($headers as $name => $value) {
+            $request = $request->withHeader($name, $value);
+        }
 
         try {
             return $this->client->sendRequest($request);
@@ -142,7 +194,7 @@ final readonly class Fetcher
      *
      * @return Result<FetchedPage, FetchFailure>
      */
-    private function page(string $url, ResponseInterface $response, int $redirects): Result
+    private function page(string $url, ResponseInterface $response, int $redirects, bool $json): Result
     {
         if ($response->getStatusCode() < 200 || $response->getStatusCode() > 299) {
             return Result::err(error: FetchFailure::HttpStatus);
@@ -151,7 +203,11 @@ final readonly class Fetcher
         $contentType = $response->getHeaderLine('Content-Type');
         $mediaType = strtolower(trim(explode(';', $contentType)[0]));
 
-        if (!\in_array($mediaType, self::MEDIA_TYPES, true)) {
+        $accepted = $json
+            ? $mediaType === 'application/json' || str_ends_with($mediaType, '+json')
+            : \in_array($mediaType, self::HTML_TYPES, true);
+
+        if (!$accepted) {
             return Result::err(error: FetchFailure::NotHtml);
         }
 

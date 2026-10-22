@@ -173,6 +173,43 @@ final class PageDocumentTest
         Assert::same(PageDocument::parse('<img src="/a.png" width="0" height=" 0px ">')->images(), [['src' => '/a.png', 'width' => 0, 'height' => 0]]);
     }
 
+    public function readsScriptsOfAType(): void
+    {
+        $document = PageDocument::parse('<head>
+            <script type="application/ld+json">{"@type":"Article"}</script>
+            <script type=" Application/LD+JSON ">{"@type":"WebPage", "name":"Каф\u00e9 é"}</script>
+            <script type="application/ld+json">   </script>
+            <script type="text/javascript">var a = "<b>";</script>
+            <script>no type</script>
+        </head>');
+
+        Assert::same($document->scripts('application/ld+json'), ['{"@type":"Article"}', '{"@type":"WebPage", "name":"Каф\u00e9 é"}']);
+        Assert::same($document->scripts('text/javascript'), ['var a = "<b>";']);
+        Assert::same($document->scripts('text/missing'), []);
+    }
+
+    public function scriptTextKeepsEntitiesLiteral(): void
+    {
+        $document = PageDocument::parse('<script type="application/ld+json">{"name":"a &amp; b &lt; c"}</script>');
+
+        Assert::same($document->scripts('application/ld+json'), ['{"name":"a &amp; b &lt; c"}']);
+    }
+
+    public function readsAlternateLinksOfAType(): void
+    {
+        $document = PageDocument::parse('<head>
+            <link rel="alternate" type="application/json+oembed" href="/oembed?format=json">
+            <link rel="ALTERNATE nofollow" type="Application/JSON+oEmbed" href=" /second ">
+            <link rel="alternate" type="text/xml+oembed" href="/oembed?format=xml">
+            <link rel="canonical" type="application/json+oembed" href="/not-alternate">
+            <link rel="alternate" type="application/json+oembed">
+            <link rel="alternate" href="/no-type">
+        </head>');
+
+        Assert::same($document->alternates('application/json+oembed'), ['/oembed?format=json', '/second']);
+        Assert::same($document->alternates('text/xml+oembed'), ['/oembed?format=xml']);
+    }
+
     public function transportCharsetWinsOverMeta(): void
     {
         $html = mb_convert_encoding('<head><meta charset="utf-8"><title>Тест</title></head>', 'Windows-1251', 'UTF-8');

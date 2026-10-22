@@ -31,6 +31,7 @@ final class PageInfoTest
             authorName: 'A',
             publishedTime: $time,
             type: 'article',
+            embedUrl: 'https://example.com/embed/1',
         );
 
         Assert::same($info->toArray(), [
@@ -44,6 +45,7 @@ final class PageInfoTest
             'authorName' => 'A',
             'publishedTime' => '2026-10-01T12:30:00+03:00',
             'type' => 'article',
+            'embedUrl' => 'https://example.com/embed/1',
         ]);
     }
 
@@ -60,15 +62,16 @@ final class PageInfoTest
             'authorName' => null,
             'publishedTime' => null,
             'type' => null,
+            'embedUrl' => null,
         ]);
     }
 
     #[DataProvider('invalidProvider')]
-    public function rejectsUrlsThatAreNotAbsoluteHttp(string $url, ?string $image, ?string $favicon): void
+    public function rejectsUrlsThatAreNotAbsoluteHttp(string $url, ?string $image, ?string $favicon, ?string $embedUrl = null): void
     {
         Expect::exception(InvalidArgumentException::class);
 
-        new PageInfo(url: $url, image: $image, favicon: $favicon);
+        new PageInfo(url: $url, image: $image, favicon: $favicon, embedUrl: $embedUrl);
     }
 
     public static function invalidProvider(): iterable
@@ -80,5 +83,6 @@ final class PageInfoTest
         yield 'data image' => ['https://example.com/', 'data:image/png;base64,AA', null];
         yield 'ftp favicon' => ['https://example.com/', null, 'ftp://example.com/f.ico'];
         yield 'hostless image' => ['https://example.com/', 'https://', null];
+        yield 'relative embed' => ['https://example.com/', null, null, '/embed'];
     }
 }

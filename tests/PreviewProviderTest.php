@@ -7,6 +7,7 @@ namespace Rasuvaeff\LinkPreview\Tests;
 use GuzzleHttp\Psr7\HttpFactory;
 use GuzzleHttp\Psr7\Response;
 use Psr\Http\Client\ClientInterface;
+use Rasuvaeff\LinkPreview\Adapter\AdapterRegistry;
 use Rasuvaeff\LinkPreview\Extract\TwitterCardsExtractor;
 use Rasuvaeff\LinkPreview\Fetch\Fetcher;
 use Rasuvaeff\LinkPreview\Fetch\FetchFailure;
@@ -14,6 +15,7 @@ use Rasuvaeff\LinkPreview\Limits;
 use Rasuvaeff\LinkPreview\PageInfo;
 use Rasuvaeff\LinkPreview\PreviewFailure;
 use Rasuvaeff\LinkPreview\PreviewProvider;
+use Rasuvaeff\LinkPreview\Tests\Support\Adapters;
 use Rasuvaeff\LinkPreview\Tests\Support\Fixtures;
 use Rasuvaeff\LinkPreview\Tests\Support\Http;
 use Testo\Assert;
@@ -144,6 +146,121 @@ final class PreviewProviderTest
         foreach (FetchFailure::cases() as $case) {
             yield $case->name => [$case];
         }
+    }
+
+    public function aSiteAdapterOutranksTheExtractorsAndTheyFillTheGaps(): void
+    {
+        $endpoint = 'https://www.youtube.com/oembed?url=https%3A%2F%2Fyoutu.be%2FdQw4w9WgXcQ&format=json';
+        $client = Http::client([
+            'https://youtu.be/dQw4w9WgXcQ' => Http::html('<title>Page</title><meta property="og:title" content="OG title"><meta property="og:description" content="OG description">'),
+            $endpoint => Adapters::json(Adapters::fixture('youtube/oembed.json')),
+        ]);
+
+        $info = $this->provider($client)->preview(url: 'https://youtu.be/dQw4w9WgXcQ')->unwrap();
+
+        Assert::same($info->title, 'Never Gonna Give You Up (Official Video)');
+        Assert::same($info->description, 'OG description');
+        Assert::same($info->embedUrl, 'https://www.youtube.com/embed/dQw4w9WgXcQ');
+        Assert::same(Http::requestedUrls($client), [$endpoint, 'https://youtu.be/dQw4w9WgXcQ']);
+    }
+
+    public function theAdapterOnlyAnswersAfterThePolicyAcceptedTheUrl(): void
+    {
+        $client = Http::client([]);
+
+        Assert::same($this->provider($client)->preview(url: 'http://localhost./youtube.com')->error(), PreviewFailure::PolicyRejected);
+        Assert::same(Http::requests($client), []);
+    }
+
+    public function aLookAlikeHostGetsNoAdapter(): void
+    {
+        $client = Http::client(['https://youtube.com.evil.example/watch' => Http::html('<title>Evil</title>')]);
+
+        $info = $this->provider($client)->preview(url: 'https://youtube.com.evil.example/watch')->unwrap();
+
+        Assert::same($info->title, 'Evil');
+        Assert::same(Http::requestedUrls($client), ['https://youtube.com.evil.example/watch']);
+    }
+
+    public function aFailedAdapterFallsBackToThePage(): void
+    {
+        $client = Http::client(['https://youtu.be/dQw4w9WgXcQ' => Http::html('<title>Page title</title>')]);
+
+        Assert::same($this->provider($client)->preview(url: 'https://youtu.be/dQw4w9WgXcQ')->unwrap()->title, 'Page title');
+    }
+
+    public function aSitePageThatIsDownStillPreviewsFromTheAdapter(): void
+    {
+        $client = Http::client(['https://www.youtube.com/oembed?url=https%3A%2F%2Fyoutu.be%2FdQw4w9WgXcQ&format=json' => Adapters::json(Adapters::fixture('youtube/oembed.json'))]);
+
+        $info = $this->provider($client)->preview(url: 'https://youtu.be/dQw4w9WgXcQ')->unwrap();
+
+        Assert::same($info->title, 'Never Gonna Give You Up (Official Video)');
+        Assert::same($info->url, 'https://youtu.be/dQw4w9WgXcQ');
+    }
+
+    public function aMissingTokenIsReportedWhenThePageIsUnavailableToo(): void
+    {
+        $client = Http::client([]);
+
+        Assert::same($this->provider($client)->preview(url: 'https://www.instagram.com/p/CxYz123AbC/')->error(), PreviewFailure::MissingToken);
+    }
+
+    public function aMissingTokenStillLetsThePageSpeak(): void
+    {
+        $client = Http::client(['https://www.instagram.com/p/CxYz123AbC/' => Http::html('<meta property="og:title" content="Public title">')]);
+
+        Assert::same($this->provider($client)->preview(url: 'https://www.instagram.com/p/CxYz123AbC/')->unwrap()->title, 'Public title');
+    }
+
+    public function aConfiguredTokenOpensTheAdapter(): void
+    {
+        $client = Http::client([
+            'https://graph.facebook.com/v21.0/instagram_oembed?url=https%3A%2F%2Fwww.instagram.com%2Fp%2FCxYz123AbC%2F&omit_script=true' => Adapters::json(Adapters::fixture('instagram/oembed.json')),
+        ]);
+        $provider = new PreviewProvider(
+            fetcher: $this->fetcher($client),
+            adapters: AdapterRegistry::standard(instagramToken: 'test-token'),
+        );
+
+        $info = $provider->preview(url: 'https://www.instagram.com/p/CxYz123AbC/')->unwrap();
+
+        Assert::same($info->authorName, 'natgeo');
+    }
+
+    public function anEmptyRegistryTurnsAdaptersOff(): void
+    {
+        $client = Http::client(['https://youtu.be/dQw4w9WgXcQ' => Http::html('<title>Page title</title>')]);
+        $provider = new PreviewProvider(fetcher: $this->fetcher($client), adapters: new AdapterRegistry());
+
+        Assert::same($provider->preview(url: 'https://youtu.be/dQw4w9WgXcQ')->unwrap()->title, 'Page title');
+        Assert::same(Http::requestedUrls($client), ['https://youtu.be/dQw4w9WgXcQ']);
+    }
+
+    public function discoveredOEmbedOutranksJsonLdWhichOutranksOpenGraph(): void
+    {
+        $page = '<head><link rel="alternate" type="application/json+oembed" href="/oembed">'
+            . '<meta property="og:title" content="OG title"><meta property="og:description" content="OG description"><meta property="og:site_name" content="OG site">'
+            . '<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"LD title","description":"LD description"}</script></head>';
+        $client = Http::client([
+            'https://example.com/p' => Http::html($page),
+            'https://example.com/oembed' => Adapters::json('{"type":"rich","title":"oEmbed title"}'),
+        ]);
+
+        $info = $this->provider($client)->preview(url: 'https://example.com/p')->unwrap();
+
+        Assert::same($info->title, 'oEmbed title');
+        Assert::same($info->description, 'LD description');
+        Assert::same($info->siteName, 'OG site');
+    }
+
+    public function aBrokenOEmbedEndpointDoesNotSpoilThePreview(): void
+    {
+        $page = '<head><link rel="alternate" type="application/json+oembed" href="http://10.0.0.1/oembed"><title>Fine</title></head>';
+        $client = Http::client(['https://example.com/p' => Http::html($page)]);
+
+        Assert::same($this->provider($client)->preview(url: 'https://example.com/p')->unwrap()->title, 'Fine');
+        Assert::same(Http::requestedUrls($client), ['https://example.com/p']);
     }
 
     private function provider(ClientInterface $client): PreviewProvider
