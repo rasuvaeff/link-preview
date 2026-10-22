@@ -61,6 +61,11 @@ final class UrlResolverTest
         Assert::same(UrlResolver::resolve(base: 'https://example.com', reference: 'x.png'), 'https://example.com/x.png');
     }
 
+    public function baseSchemeAndHostAreLowerCased(): void
+    {
+        Assert::same(UrlResolver::resolve(base: 'HTTPS://Example.COM/a/b', reference: 'x'), 'https://example.com/a/x');
+    }
+
     public function baseWithPortIsInherited(): void
     {
         Assert::same(UrlResolver::resolve(base: 'http://example.com:8080/a/', reference: 'x.png'), 'http://example.com:8080/a/x.png');

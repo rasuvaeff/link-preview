@@ -318,6 +318,39 @@ final class FetcherTest
         Assert::same($this->fetcher($client, maxBodyBytes: 10_000)->fetch(url: 'https://example.com/')->error(), FetchFailure::TooLarge);
     }
 
+    public function declaredLengthExactlyAtTheLimitPasses(): void
+    {
+        $response = new Response(200, ['Content-Type' => 'text/html', 'Content-Length' => '100'], str_repeat('a', 100));
+        $client = Http::client(['https://example.com/' => $response]);
+
+        Assert::true($this->fetcher($client, maxBodyBytes: 100)->fetch(url: 'https://example.com/')->isOk());
+    }
+
+    public function malformedContentLengthIsIgnored(): void
+    {
+        $response = new Response(200, ['Content-Type' => 'text/html', 'Content-Length' => '999999999x'], 'small');
+        $client = Http::client(['https://example.com/' => $response]);
+
+        Assert::same($this->fetcher($client, maxBodyBytes: 100)->fetch(url: 'https://example.com/')->unwrap()->body, 'small');
+    }
+
+    public function charsetParameterIsCaseInsensitive(): void
+    {
+        $client = Http::client(['https://example.com/' => Http::html('x', 'TEXT/HTML ; CHARSET=UTF-8')]);
+
+        $page = $this->fetcher($client)->fetch(url: 'https://example.com/')->unwrap();
+
+        Assert::same($page->charset, 'UTF-8');
+        Assert::same($page->contentType, 'text/html');
+    }
+
+    public function aBodyLimitOfOneByteIsValid(): void
+    {
+        $client = Http::client(['https://example.com/' => Http::html('a')]);
+
+        Assert::same($this->fetcher($client, maxBodyBytes: 1)->fetch(url: 'https://example.com/')->unwrap()->body, 'a');
+    }
+
     public function bodyExactlyAtTheLimitPasses(): void
     {
         $client = Http::client(['https://example.com/' => Http::html(str_repeat('a', 100))]);

@@ -34,6 +34,7 @@ final class CidrTest
         yield 'one bit' => ['128.0.0.0/1', '200.0.0.1', true];
         yield 'one bit miss' => ['128.0.0.0/1', '100.0.0.1', false];
         yield 'zero prefix matches all of its family' => ['0.0.0.0/0', '8.8.8.8', true];
+        yield 'zero prefix matches the high half too' => ['0.0.0.0/0', '200.0.0.1', true];
         yield 'v4 rule never matches v6' => ['0.0.0.0/0', '::1', false];
         yield 'v6 rule never matches v4' => ['::/0', '1.2.3.4', false];
         yield 'v6 hit' => ['fc00::/7', 'fd12:3456::1', true];

@@ -1,18 +1,25 @@
-# AGENTS.md — {{PACKAGE_KEBAB}}
+# AGENTS.md — link-preview
 
 Guidance for AI agents working on this package. Read before changing code.
 
 ## What this is
 
-<!-- 1-2 абзаца: что делает пакет, какой public API, namespace -->
+PSR-18 link preview: `Fetch\Fetcher` (own redirect loop, `UrlPolicy` on every
+hop, size and content-type limits), `Html\PageDocument`, OpenGraph / Twitter
+Cards / HTML-fallback extractors, `PageInfo`, `Limits` and the
+`PreviewProvider` facade. Everything returns `Rasuvaeff\Result\Result` with an
+enum failure. Namespace `Rasuvaeff\LinkPreview`.
+
+The agent skill ships in `resources/skills/rasuvaeff-link-preview/SKILL.md`
+(distributed via `llm/skills`, `extra.skills` in `composer.json`); keep it in
+step with the public API.
 
 ## Golden rules
 
 1. **Verification is mandatory.** Never claim "done" without a fresh green
    `composer build`. "Should work" does not count.
 2. **No suppressions.** No `@psalm-suppress`, no baseline. Fix the root cause.
-3. **Replace this rule before the first commit.** Add one package-specific
-   safety/validation/contract rule; do not leave the placeholder in the file.
+3. **UrlPolicy is the SSRF boundary.** Every URL that is fetched - first, redirect target - goes through `UrlPolicy::check()` before a request is made; never fetch around `Fetcher`, never weaken a range without a test, and never claim DNS-rebinding protection (pure PSR-18 cannot pin).
 4. **Preserve the public contract.** Update README + tests with any API change.
 
 ## Commands
@@ -20,11 +27,7 @@ Guidance for AI agents working on this package. Read before changing code.
 No PHP/Composer on the host — run in Docker via the `composer:2` image.
 
 ```bash
-docker run --rm -v "$PWD":/app -w /app composer:2 composer build
-docker run --rm -v "$PWD":/app -w /app composer:2 composer cs:fix
-docker run --rm -v "$PWD":/app -w /app composer:2 composer psalm
-docker run --rm -v "$PWD":/app -w /app composer:2 composer test
-docker run --rm -v "$PWD":/app -w /app composer:2 composer release-check
+make image   # once: composer:2 + ext-intl + pcov -> link-preview-php:local
 ```
 
 Or with Make:
@@ -45,7 +48,8 @@ make release-check
 
 ## Invariants & gotchas
 
-<!-- Add package-specific invariants here -->
+- `ext-intl` is required (IDN hosts); the stock `composer:2` image lacks it, so use `make image`.
+- Mutation gate `minMsi` is 90; PageCorpusTest fixtures in `tests/fixtures/` record page intent, edit them deliberately.
 - Code: `declare(strict_types=1)`, `final readonly class`, `#[\Override]`,
   explicit types.
 - **Validation patterns anchor with `\z`, never `$`.** In PCRE `$` also matches
@@ -53,29 +57,6 @@ make release-check
   the value the whitelist was supposed to reject then travels on as if it were
   clean. `/D` does the same job. Cover it with a data-provider case carrying
   `"value\n"`, or the regression comes back unnoticed.
-<!-- If this package ships yiisoft/db-migration migrations, keep these too;
-     delete otherwise. Full rationale: "Пакеты с миграциями" in the monorepo
-     AGENTS.md. -->
-- **Migrations live in `src/Migration/` under the package namespace**, never as
-  a global class in `migrations/`: a class outside PSR-4 is not autoloadable, so
-  any DI definition mentioning it makes `Yiisoft\Di\Container` fatal at build
-  time in every request. Register with
-  `MigrationService::setSourceNamespaces()`, not `setSourcePaths()`.
-- **The table name is a typed value object, never a scalar.**
-  `yiisoft/db-migration` builds migrations through `Injector::make()`, which
-  resolves arguments by name or by type and never reads a container definition
-  keyed by the migration's own class — a `string $table` has no type to resolve,
-  so `M...::class => ['__construct()' => ['table' => …]]` silently yields the
-  default. `config/di.php` builds the VO from params and passes it to the
-  migration *and* the runtime class, so the two cannot disagree; index names are
-  derived from it (PostgreSQL scopes index names per schema, not per table).
-- **Test the migration through the real `Injector`**, with and without a
-  container binding, and assert the created column set plus each index's
-  columns — migrations under `src/` are mutated by infection, and
-  `ArrayItemRemoval` in `createTable`/`createIndex` escapes otherwise.
-- Changing a migration's FQCN is a **major** and needs `UPGRADE.md`
-  (`UPDATE migration SET name = …` before the first `migrate:up`). `bc-check`
-  stays silent — the old class was outside PSR-4, so roave never saw it.
 - `examples/` is part of the public contract: keep scripts runnable and update
   `examples/README.md` when example usage changes.
 - **CI workflows are SHA-pinned.** Every `uses:` in `.github/workflows/*.yml`

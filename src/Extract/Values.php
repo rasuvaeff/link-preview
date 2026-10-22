@@ -20,7 +20,7 @@ final readonly class Values
      */
     public static function time(?string $value): ?DateTimeImmutable
     {
-        if ($value === null || preg_match('/\A\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}.*)?\z/s', $value) !== 1) {
+        if ($value === null || preg_match('/\A\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}.*)?\z/', $value) !== 1) {
             return null;
         }
 

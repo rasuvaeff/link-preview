@@ -1,9 +1,15 @@
-DOCKER := docker run --rm -v "$(PWD)":/app -w /app composer:2
+# composer:2 ships neither ext-intl (IDN host handling, psalm stubs) nor pcov;
+# `make image` builds a local image that has both
+IMAGE ?= link-preview-php:local
+DOCKER := docker run --rm -v "$(PWD)":/app -w /app $(IMAGE)
 DOCKER_HOST := docker run --rm --network host -v "$(PWD)":/app -w /app
-PCOV_BOOTSTRAP := apk add --no-cache $$PHPIZE_DEPS >/dev/null && pecl install pcov >/dev/null && docker-php-ext-enable pcov
+PCOV_BOOTSTRAP := true
 
-.PHONY: bench build cs cs-fix psalm test mutation rector rector-fix install normalize require-checker \
+.PHONY: image bench build cs cs-fix psalm test mutation rector rector-fix install normalize require-checker \
        test-coverage test-coverage-ci update-deps release-check bc-check audit-package help
+
+image:
+	printf 'FROM composer:2\nRUN apk add --no-cache $$PHPIZE_DEPS icu-dev && docker-php-ext-install intl && pecl install pcov && docker-php-ext-enable pcov\n' | docker build -t $(IMAGE) -
 
 install:
 	$(DOCKER) composer install --no-interaction --no-progress --prefer-dist
@@ -70,6 +76,7 @@ help:
 	@echo "Usage: make <target>"
 	@echo ""
 	@echo "Targets:"
+	@echo "  image            build the PHP image with intl and pcov"
 	@echo "  install          composer install"
 	@echo "  bench            run benchmarks (Benchmarks suite)"
 	@echo "  build            full gate (validate + normalize + cs + psalm + test)"

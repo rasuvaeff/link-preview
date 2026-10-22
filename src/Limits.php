@@ -23,11 +23,7 @@ final readonly class Limits
     private const string ELLIPSIS = '…';
 
     /**
-     * @param int<1, max> $titleLength
-     * @param int<1, max> $descriptionLength
-     * @param int<1, max> $siteNameLength
-     * @param int<1, max> $authorNameLength
-     * @param int<1, max> $maxUrlLength
+     * @param int $titleLength in characters, at least 1
      */
     public function __construct(
         private int $titleLength = 200,
@@ -61,7 +57,6 @@ final readonly class Limits
     }
 
     /**
-     * @param int<1, max> $limit
      */
     private function text(?string $value, int $limit): ?string
     {

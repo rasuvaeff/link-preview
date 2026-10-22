@@ -1,26 +1,98 @@
-# {{PACKAGE_KEBAB}}
+# link-preview
 
 Install:
 
 ```
-composer require rasuvaeff/{{PACKAGE_KEBAB}}
+composer require rasuvaeff/link-preview
+composer require guzzlehttp/guzzle   # any PSR-18 client + PSR-17 request factory
 ```
 
 ## Rules
 
-- PHP 8.3+, `declare(strict_types=1)`
-- Immutable by default (`final readonly class`)
-- <!-- Add package-specific rules here -->
+- PHP 8.3+, `declare(strict_types=1)`, ext dom/libxml/mbstring/intl/ctype/filter
+- Everything returns `Rasuvaeff\Result\Result` with an enum failure; nothing throws on bad network input
+- The PSR-18 client MUST NOT follow redirects (Guzzle `allow_redirects => false`): `Fetcher` follows them itself and applies `UrlPolicy` to every hop
+- No DNS pinning is possible with PSR-18; timeouts belong to the client; mitigate rebinding with a trusted resolving egress proxy
+- Output URLs are absolute http(s) only; text is plain (escape it when rendering)
+- Namespace `Rasuvaeff\LinkPreview`
 
 ## API
 
-<!-- For each public class, provide a self-contained example.
-The goal: an LLM can use the package correctly from this file alone. -->
+```php
+use GuzzleHttp\Client;
+use GuzzleHttp\Psr7\HttpFactory;
+use Rasuvaeff\LinkPreview\Fetch\Fetcher;
+use Rasuvaeff\LinkPreview\Fetch\UrlPolicy;
+use Rasuvaeff\LinkPreview\Fetch\UserAgentMap;
+use Rasuvaeff\LinkPreview\Limits;
+use Rasuvaeff\LinkPreview\PreviewProvider;
+
+$provider = new PreviewProvider(
+    fetcher: new Fetcher(
+        client: new Client(['allow_redirects' => false, 'http_errors' => false, 'timeout' => 5.0]),
+        requestFactory: new HttpFactory(),
+        policy: new UrlPolicy(allowedNetworks: [], allowedPorts: [80, 443]),
+        userAgents: new UserAgentMap(byHost: ['t.me' => 'TelegramBot (like TwitterBot)']),
+        maxRedirects: 5,
+        maxBodyBytes: 2_097_152,
+        chainBudgetSeconds: 10.0, // checked between hops only
+    ),
+    extractors: null, // default: OpenGraphExtractor, TwitterCardsExtractor, HtmlFallbackExtractor (priority order)
+    limits: new Limits(titleLength: 200, descriptionLength: 500, siteNameLength: 100, authorNameLength: 100, maxUrlLength: 2048, httpsImagesOnly: false),
+);
+
+$result = $provider->preview(url: 'https://example.com/article'); // Result<PageInfo, PreviewFailure>
+$result = $provider->fromHtml(html: $html, pageUrl: 'https://example.com/a', charset: 'windows-1251'); // no network
+
+$info = $result->unwrap();
+$info->url; $info->title; $info->description; $info->image; $info->favicon;
+$info->siteName; $info->language; $info->authorName; $info->publishedTime; $info->type; // all ?string except url, publishedTime ?DateTimeImmutable
+$info->toArray();
+
+$result->error(); // PreviewFailure: PolicyRejected, Network, TooManyRedirects, InvalidRedirect,
+                  // BudgetExceeded, HttpStatus, NotHtml, TooLarge, EmptyPage
+```
+
+### UrlPolicy
 
 ```php
-use Rasuvaeff\{{PACKAGE_PASCAL}}\SomeClass;
-
-$object = new SomeClass(
-    param: 'value',
-);
+$policy = new UrlPolicy();
+$policy->check(url: 'HTTPS://Example.COM:443/a#f'); // Result<string, UrlRejection>, ok = 'https://example.com/a'
+// UrlRejection: Malformed, Scheme, Credentials, MissingHost, InvalidHost, NonCanonicalIp, Port, PrivateAddress
 ```
+
+Rejected: non-http(s) schemes, credentials, ports other than 80/443 (configurable), localhost and *.localhost,
+loopback/private/link-local/CGNAT/documentation/multicast/reserved IPv4 and IPv6, IPv6 carrying IPv4
+(::7f00:1, ::ffff:a.b.c.d, 64:ff9b::/96, 2002::/16), decimal/hex/octal/short IPv4 spellings, control characters.
+IDN hosts are converted to ASCII. Names are never resolved. `allowedNetworks` (CIDR or address list) opens private networks for dev;
+`localhost` names count as 127.0.0.1.
+
+### Fetcher
+
+```php
+$page = $fetcher->fetch(url: 'https://example.com/'); // Result<FetchedPage, FetchFailure>
+// FetchedPage: url (final), body, contentType, charset, redirects
+// FetchFailure: PolicyRejected, Network, TooManyRedirects, InvalidRedirect, BudgetExceeded, HttpStatus, NotHtml, TooLarge
+```
+
+Only text/html and application/xhtml+xml, 2xx, body <= maxBodyBytes. Redirects 301/302/303/307/308, `Location` resolved
+against the current URL, policy checked before each request.
+
+### Extractors and documents
+
+```php
+use Rasuvaeff\LinkPreview\Html\PageDocument;
+use Rasuvaeff\LinkPreview\Extract\OpenGraphExtractor;
+
+$document = PageDocument::parse(html: $bytes, charset: 'utf-8'); // charset: transport > BOM > <meta charset> > UTF-8
+$document->title(); $document->language(); $document->baseHref();
+$document->meta('og:title');      // list<string>, matches property or name, case-insensitive
+$document->links('icon');         // list<string>, rel token match
+$document->images();              // list<array{src, width, height}>
+
+(new OpenGraphExtractor())->extract(document: $document, pageUrl: 'https://example.com/')
+    ; // Result<Metadata, ExtractFailure::NoMetadata>
+```
+
+Implement `Rasuvaeff\LinkPreview\Extract\Extractor` to add a source; pass it in `extractors:` (highest priority first).
+Per-field merge: the first extractor that has the field wins. Page URL = `og:url` > `canonical` > fetched URL.

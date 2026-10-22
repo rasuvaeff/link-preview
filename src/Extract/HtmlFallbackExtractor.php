@@ -41,6 +41,9 @@ final readonly class HtmlFallbackExtractor implements Extractor
         return $metadata->isEmpty() ? Result::err(error: ExtractFailure::NoMetadata) : Result::ok(value: $metadata);
     }
 
+    /**
+     * @return non-empty-string|null
+     */
     private function image(PageDocument $document, UrlContext $urls): ?string
     {
         foreach ($document->images() as $image) {

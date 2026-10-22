@@ -45,10 +45,7 @@ final readonly class PageDocument
             try {
                 $document->loadHTML($ascii, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
             } finally {
-                if ($previous === false) {
-                    libxml_clear_errors();
-                }
-
+                // switching the handling off also empties libxml's error buffer
                 libxml_use_internal_errors($previous);
             }
         }
@@ -199,7 +196,7 @@ final readonly class PageDocument
      */
     private static function dimension(string $value): ?int
     {
-        return preg_match('/\A\s*(\d{1,6})(?:px)?\s*\z/', $value, $matches) === 1 ? (int) $matches[1] : null;
+        return preg_match('/\A\s*(\d{1,6})(?:px)?\s*\z/', $value, $matches) === 1 ? max(0, (int) $matches[1]) : null;
     }
 
     private static function toUtf8(string $html, ?string $transportCharset): string
@@ -230,9 +227,9 @@ final readonly class PageDocument
         };
 
         try {
-            return mb_convert_encoding($html, 'UTF-8', $charset);
+            return (string) mb_convert_encoding($html, 'UTF-8', $charset);
         } catch (ValueError) {
-            return mb_convert_encoding($html, 'UTF-8', 'UTF-8');
+            return (string) mb_convert_encoding($html, 'UTF-8', 'UTF-8');
         }
     }
 }

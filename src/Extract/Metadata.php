@@ -14,6 +14,11 @@ use DateTimeImmutable;
  */
 final readonly class Metadata
 {
+    /**
+     * @param non-empty-string|null $url
+     * @param non-empty-string|null $image
+     * @param non-empty-string|null $favicon
+     */
     public function __construct(
         public ?string $url = null,
         public ?string $title = null,

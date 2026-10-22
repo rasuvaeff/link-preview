@@ -42,7 +42,7 @@ final readonly class UrlResolver
             return self::fromParts(self::parse($baseParts['scheme'] . ':' . $reference), $baseParts['scheme']);
         }
 
-        if (preg_match('/\A([^?#]*)(?:\?([^#]*))?(?:#.*)?\z/s', $reference, $split) !== 1) {
+        if (preg_match('/\A([^?#]*)(?:\?([^#]*))?(?:#.*)?\z/', $reference, $split) !== 1) {
             return null;
         }
 
@@ -59,7 +59,6 @@ final readonly class UrlResolver
         }
 
         $parts = [
-            'scheme' => $baseParts['scheme'],
             'host' => $baseParts['host'],
             'path' => $path,
         ];
