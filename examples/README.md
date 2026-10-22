@@ -13,4 +13,7 @@ docker run --rm -v "$PWD":/app -w /app composer:2 php examples/parse_html.php
 | `url_policy.php` | What `UrlPolicy` accepts and rejects (SSRF edge cases, dev allowlist) | No |
 | `redirects.php` | A redirect chain refused on the second hop, with the requests actually sent | No |
 | `limits_merge.php` | Source priority, custom order and `Limits` on an inline document | No |
+| `adapters_oembed.php` | YouTube, TikTok, Twitter/X, Twitch from recorded oEmbed answers | No |
+| `adapters_pages.php` | GitHub, Telegram, VK (page tags) and Wikipedia, Rutube (APIs) from recorded answers | No |
+| `adapters_tokens.php` | Instagram: the missing-token failure, then a configured token | No |
 | `live.php` | A real fetch with Guzzle, only when `LINK_PREVIEW_URL` is set | Yes (optional) |

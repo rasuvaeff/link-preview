@@ -3,8 +3,10 @@ name: rasuvaeff-link-preview
 description: >-
   Link previews for PHP with rasuvaeff/link-preview - PreviewProvider facade,
   Fetcher (PSR-18 with its own redirect loop), UrlPolicy (SSRF whitelist),
-  PageInfo, Limits, UserAgentMap, PageDocument and the OpenGraph, Twitter
-  Cards and HTML-fallback extractors, all returning Result with enum
+  PageInfo, Limits, UserAgentMap, PageDocument, the oEmbed, JSON-LD,
+  OpenGraph, Twitter Cards and HTML-fallback extractors and eleven site
+  adapters (YouTube, TikTok, Twitter/X, Twitch, Wikipedia, GitHub,
+  Instagram, Facebook, Telegram, VK, Rutube), all returning Result with enum
   failures. Use when writing, reviewing or debugging code that fetches a
   user-supplied URL and extracts title/description/image metadata in a
   project that has this package installed.
@@ -49,7 +51,21 @@ Cards and plain-HTML metadata. Namespace `Rasuvaeff\LinkPreview\`.
    from a stranger: escape them for the output context (HTML, JSON, Markdown),
    never render as markup.
 
-7. **Do not log or display secrets.** URLs may carry tokens in the query
+7. **Adapters are matched by host labels, never by substring** (`str_contains`
+   would take `youtube.com.evil.example` for YouTube). A new adapter returns
+   only data, reaches the network through `AdapterContext` (so `UrlPolicy`
+   applies) and never builds an endpoint from page content without the policy.
+   oEmbed endpoints named by a page, and JSON-LD `@context` values, are
+   untrusted: the endpoint goes through the same `Fetcher`, a remote
+   `@context` is never loaded.
+
+8. **Tokens (Instagram/Facebook required, Twitter optional)** are constructor
+   arguments marked `#[\SensitiveParameter]`, sent as an `Authorization`
+   header to the API host only, never placed in a URL, a failure, an
+   exception, a log or a README example (use `'<token>'`). Without a token the
+   adapter answers `AdapterFailure::MissingToken` and makes no request.
+
+9. **Do not log or display secrets.** URLs may carry tokens in the query
    string; redact query and fragment before logging, metrics or error reports.
    Never put credentials in `UserAgentMap` values or URLs.
 
@@ -93,8 +109,12 @@ No network (tests, stored HTML): `$provider->fromHtml(html: $html, pageUrl: $url
 
 ## Pitfalls
 
-- Fields merge per field by priority: OpenGraph > Twitter Cards > HTML. A
-  custom `extractors:` list replaces the default; put the highest priority first.
+- Fields merge per field by priority: site adapter > oEmbed (discovery makes
+  an extra request) > JSON-LD > OpenGraph > Twitter Cards > HTML. A custom
+  `extractors:` list replaces the default; put the highest priority first.
+  `new AdapterRegistry()` turns adapters off.
+- A failed adapter does not fail the preview; the generic extractors still
+  run. Telegram and VK need a `UserAgentMap` entry for their host.
 - `Limits` drops an over-long or (with `httpsImagesOnly`) plain-http image
   after the merge; the next source is not consulted.
 - `PageInfo::$url` is `og:url`, else `canonical`, else the final fetched URL.

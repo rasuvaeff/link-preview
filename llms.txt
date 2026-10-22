@@ -14,6 +14,8 @@ composer require guzzlehttp/guzzle   # any PSR-18 client + PSR-17 request factor
 - The PSR-18 client MUST NOT follow redirects (Guzzle `allow_redirects => false`): `Fetcher` follows them itself and applies `UrlPolicy` to every hop
 - No DNS pinning is possible with PSR-18; timeouts belong to the client; mitigate rebinding with a trusted resolving egress proxy
 - Output URLs are absolute http(s) only; text is plain (escape it when rendering)
+- Source priority per field: site adapter > oEmbed (discovered) > JSON-LD > OpenGraph > Twitter Cards > HTML
+- Adapter tokens (Instagram, Facebook required; Twitter optional) are constructor args, sent as Authorization headers to the API host only, never in URLs; no token = AdapterFailure::MissingToken, no request
 - Namespace `Rasuvaeff\LinkPreview`
 
 ## API
@@ -37,7 +39,8 @@ $provider = new PreviewProvider(
         maxBodyBytes: 2_097_152,
         chainBudgetSeconds: 10.0, // checked between hops only
     ),
-    extractors: null, // default: OpenGraphExtractor, TwitterCardsExtractor, HtmlFallbackExtractor (priority order)
+    extractors: null, // default: OEmbedExtractor, JsonLdExtractor, OpenGraphExtractor, TwitterCardsExtractor, HtmlFallbackExtractor
+    adapters: null,   // default: AdapterRegistry::standard(); new AdapterRegistry() = off
     limits: new Limits(titleLength: 200, descriptionLength: 500, siteNameLength: 100, authorNameLength: 100, maxUrlLength: 2048, httpsImagesOnly: false),
 );
 
@@ -96,3 +99,23 @@ $document->images();              // list<array{src, width, height}>
 
 Implement `Rasuvaeff\LinkPreview\Extract\Extractor` to add a source; pass it in `extractors:` (highest priority first).
 Per-field merge: the first extractor that has the field wins. Page URL = `og:url` > `canonical` > fetched URL.
+
+### Site adapters
+
+```php
+use Rasuvaeff\LinkPreview\Adapter\AdapterRegistry;
+
+AdapterRegistry::standard(
+    twitterToken: null,          // optional
+    instagramToken: '<token>',   // required for Instagram, else MissingToken
+    facebookToken: '<token>',    // required for Facebook, else MissingToken
+    twitchParents: ['example.com'], // needed for a Twitch embedUrl
+);
+```
+
+YouTube, TikTok, Twitter/X, Twitch (oEmbed), Wikipedia (REST summary), GitHub (OG, gists), Instagram, Facebook (Graph API oEmbed),
+Telegram (OG + widget), VK (OG + video_ext.php), Rutube (video API). Hosts match by labels: www./m./subdomains yes,
+`youtube.com.evil.example` no. Custom site: implement `Adapter` (`domains(): list<string>`, `preview(string $url, AdapterContext $context): Result<Metadata, AdapterFailure>`)
+and use `$context->html($url)` / `$context->json($url, $headers)` - the only way to reach the network, always under UrlPolicy.
+AdapterFailure: MissingToken, UnsupportedUrl, Unavailable, InvalidResponse. PreviewFailure also has MissingToken.
+`PageInfo::$embedUrl` is an absolute http(s) player URL when the source knows one.

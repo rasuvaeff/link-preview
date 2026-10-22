@@ -8,7 +8,7 @@
 [![PHP](https://img.shields.io/packagist/dependency-v/rasuvaeff/link-preview/php)](https://packagist.org/packages/rasuvaeff/link-preview)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE.md)
 
-Превью ссылок для PHP: загрузка пользовательского URL через любой PSR-18 клиент с SSRF-безопасным циклом редиректов и чтение заголовка, описания, картинки, иконки и прочего из OpenGraph, Twitter Cards и обычного HTML.
+Превью ссылок для PHP: загрузка пользовательского URL через любой PSR-18 клиент с SSRF-безопасным циклом редиректов и чтение заголовка, описания, картинки, иконки и прочего из oEmbed, JSON-LD, OpenGraph, Twitter Cards и обычного HTML - со встроенными адаптерами для одиннадцати сайтов.
 
 > Using an AI coding assistant? [llms.txt](llms.txt) contains a compact API reference you can share with the model.
 
@@ -55,11 +55,13 @@ if ($result->isOk()) {
 }
 ```
 
-Конвейер: `Fetcher` (политика на каждом хопе, лимиты размера и content-type) -> `PageDocument` -> экстракторы -> слияние по фиксированному приоритету -> `Limits` -> `PageInfo`. Каждый этап возвращает `Result` с enum-отказом; на плохой ответ сети ничего не бросается.
+Конвейер: `UrlPolicy` -> адаптер сайта (YouTube, Wikipedia, ...) -> `Fetcher` (политика на каждом хопе, лимиты размера и content-type) -> `PageDocument` -> экстракторы -> слияние по фиксированному приоритету -> `Limits` -> `PageInfo`. Каждый этап возвращает `Result` с enum-отказом; на плохой ответ сети ничего не бросается.
 
 ### Источники и приоритет
 
-Каждое поле берётся из первого источника, где оно есть: **OpenGraph**, затем **Twitter Cards**, затем **обычный HTML**. Свой порядок задаётся списком `extractors:` (сначала самый приоритетный).
+Каждое поле берётся из первого источника, где оно есть, в таком порядке: **адаптер сайта**, **oEmbed** (находится через `<link rel="alternate" type="application/json+oembed">`), **JSON-LD** (schema.org Article, VideoObject, WebPage, Organization), **OpenGraph**, **Twitter Cards**, **обычный HTML**. Свой порядок задаётся списком `extractors:` (сначала самый приоритетный, после адаптера).
+
+Поиск oEmbed делает один дополнительный запрос: адрес эндпоинта выбирает страница, поэтому он загружается тем же `Fetcher` - та же `UrlPolicy`, те же проверки редиректов - и не может добраться туда, куда не мог бы исходный URL. JSON-LD читает небольшой встроенный читатель (`SimpleJsonLdReader` за интерфейсом `JsonLdReader`, чтобы его можно было заменить полноценным процессором): понимаются только контексты schema.org, удалённый или inline `@context` не загружается, блок пропускается.
 
 | Поле | OpenGraph | Twitter Cards | HTML fallback |
 |---|---|---|---|
@@ -133,6 +135,41 @@ new PreviewProvider(fetcher: $fetcher, limits: new Limits(titleLength: 120, desc
 
 Из текста вычищаются невалидный UTF-8 и управляющие символы, серии пробелов схлопываются в один, слишком длинное обрезается по символам с `…` на конце, входящим в лимит (по умолчанию: заголовок 200, описание 500, сайт 100, автор 100). Повторное применение `Limits` ничего не меняет. Картинка или иконка длиннее `maxUrlLength` (2048) отбрасывается; с `httpsImagesOnly` отбрасываются и http-адреса (после слияния следующий источник *не* опрашивается).
 
+### Адаптеры сайтов
+
+`PreviewProvider` выбирает адаптер по хосту URL (после того как политика его приняла) и ставит его ответ в слиянии впереди всего остального. Хосты сопоставляются по меткам: `www.youtube.com` и `m.youtube.com` - YouTube, а `youtube.com.evil.example` и `notyoutube.com` - нет. Если адаптер не сработал, общие экстракторы всё равно работают; если и страница недоступна, отсутствие токена сообщается как `PreviewFailure::MissingToken`.
+
+| Сайт | Адаптер | Механизм | Что нужно |
+|---|---|---|---|
+| YouTube | `YouTubeAdapter` | oEmbed + embed-URL по id видео | ничего |
+| TikTok | `TikTokAdapter` | oEmbed | ничего |
+| Twitter / X | `TwitterAdapter` | `publish.twitter.com/oembed`, текст поста как описание | токен необязателен |
+| Twitch | `TwitchAdapter` | oEmbed + URL плеера с `parent` | ничего (для embed-URL передайте `parents:`) |
+| Wikipedia | `WikipediaAdapter` | REST summary API языка ссылки | ничего |
+| GitHub | `GitHubAdapter` | OpenGraph страницы, с учётом gist | ничего |
+| Instagram | `InstagramAdapter` | Graph API `instagram_oembed` | **токен доступа** |
+| Facebook | `FacebookAdapter` | Graph API `oembed_post` / `oembed_video` / `oembed_page` | **токен доступа** |
+| Telegram | `TelegramAdapter` | OpenGraph + URL виджета | ничего (желательна запись `UserAgentMap` для `t.me`) |
+| VK | `VkAdapter` | OpenGraph + плеер `video_ext.php` | ничего (желательна запись `UserAgentMap` для `vk.com`) |
+| Rutube | `RutubeAdapter` | JSON video API | ничего |
+
+```php
+use Rasuvaeff\LinkPreview\Adapter\AdapterRegistry;
+
+$provider = new PreviewProvider(
+    fetcher: $fetcher,
+    adapters: AdapterRegistry::standard(
+        instagramToken: '<token>',
+        facebookToken: '<token>',
+        twitchParents: ['example.com'],
+    ),
+);
+```
+
+Токены - аргументы конструктора (`#[\SensitiveParameter]`), уходят заголовком `Authorization: Bearer` только на хост API (редирект на другой хост их отбрасывает) и никогда не попадают в URL, отказ или исключение. Без токена Instagram и Facebook отвечают `AdapterFailure::MissingToken`, не делая ни одного запроса. `new AdapterRegistry()` выключает адаптеры; свой сайт добавляется реализацией `Adapter`.
+
+Фикстуры тестов адаптеров лежат в `tests/fixtures/adapters/`: они написаны по документированным форматам ответов сервисов, это не живые записи. `bin/record-preview-corpus --check` заново разбирает каждую закоммиченную запись (без сети); `bin/record-preview-corpus --record=<name> --live` обновляет файлы одной записи с реального сервиса, а `LINK_PREVIEW_LIVE=1 vendor/bin/testo --suite=Integration` сверяет реальные сервисы с ожиданиями кода.
+
 ### Публичный API
 
 | Класс | Описание |
@@ -145,7 +182,9 @@ new PreviewProvider(fetcher: $fetcher, limits: new Limits(titleLength: 120, desc
 | `Fetch\UrlPolicy`, `UrlRejection` | SSRF-политика |
 | `Fetch\UserAgentMap` | Хост -> `User-Agent` |
 | `Html\PageDocument` | DOM только для чтения: `title()`, `meta()`, `links()`, `images()`, `language()`, `baseHref()` |
-| `Extract\Extractor`, `OpenGraphExtractor`, `TwitterCardsExtractor`, `HtmlFallbackExtractor` | Источники; возвращают `Result<Metadata, ExtractFailure>` |
+| `Extract\Extractor`, `OEmbedExtractor`, `JsonLdExtractor`, `OpenGraphExtractor`, `TwitterCardsExtractor`, `HtmlFallbackExtractor` | Источники; возвращают `Result<Metadata, ExtractFailure>` |
+| `Extract\JsonLdReader`, `SimpleJsonLdReader`, `JsonLdFailure` | Заменяемый читатель JSON-LD |
+| `Adapter\Adapter`, `AdapterRegistry`, `AdapterContext`, `AdapterFailure` | Адаптеры сайтов и их реестр; одиннадцать встроенных |
 | `Extract\Metadata` | Что знает один источник (все поля необязательны) |
 
 ## Безопасность
@@ -156,7 +195,8 @@ new PreviewProvider(fetcher: $fetcher, limits: new Limits(titleLength: 120, desc
 - Альтернативные записи IP, IPv4 внутри IPv6, `localhost.`, трюки с userinfo и управляющие символы отклоняются или классифицируются по реальному адресу.
 - HTML разбирается libxml (`LIBXML_NONET`) и не исполняется; внешние сущности не загружаются; скрипты - просто текст.
 - Размер ответа ограничен; читаются только HTML-типы содержимого.
-- Любой URL со страницы - абсолютный http(s) без учётных данных.
+- Любой URL со страницы - абсолютный http(s) без учётных данных. Эндпоинт oEmbed, названный страницей, загружается под той же политикой и проверками редиректов, что и страница; `@context` JSON-LD не загружается никогда.
+- Хосты адаптеров сопоставляются по меткам, а не подстрокой; токены адаптеров уходят заголовками только на хост API и никогда не попадают в URL, отказы и исключения.
 
 Чего пакет сделать не может, потому что PSR-18 не даёт для этого средств:
 
@@ -179,6 +219,9 @@ new PreviewProvider(fetcher: $fetcher, limits: new Limits(titleLength: 120, desc
 | `url_policy.php` | Что `UrlPolicy` принимает и отклоняет, allowlist для разработки | Нет |
 | `redirects.php` | Цепочка редиректов, отклонённая на втором хопе | Нет |
 | `limits_merge.php` | Приоритет источников, свой порядок и `Limits` | Нет |
+| `adapters_oembed.php` | YouTube, TikTok, Twitter/X, Twitch по записанным ответам oEmbed | Нет |
+| `adapters_pages.php` | GitHub, Telegram, VK (теги страницы) и Wikipedia, Rutube (API) по записанным ответам | Нет |
+| `adapters_tokens.php` | Instagram: отказ из-за отсутствия токена и затем настроенный токен | Нет |
 | `live.php` | Реальная загрузка через Guzzle, только если задан `LINK_PREVIEW_URL` | Да (необязательно) |
 
 ## Разработка

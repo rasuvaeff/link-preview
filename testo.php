@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Rasuvaeff\Understudy\Testo\UnderstudyPlugin;
 use Testo\Application\Config\ApplicationConfig;
+use Testo\Application\Config\FinderConfig;
 use Testo\Application\Config\SuiteConfig;
 use Testo\Bench\BenchmarkPlugin;
 
@@ -12,8 +13,15 @@ return new ApplicationConfig(
     suites: [
         new SuiteConfig(
             name: 'Unit',
-            location: ['tests'],
+            location: new FinderConfig(
+                include: ['tests'],
+                exclude: ['tests/Integration'],
+            ),
             plugins: [new UnderstudyPlugin()],
+        ),
+        new SuiteConfig(
+            name: 'Integration',
+            location: ['tests/Integration'],
         ),
         new SuiteConfig(
             name: 'Benchmarks',

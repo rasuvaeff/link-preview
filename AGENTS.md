@@ -7,7 +7,8 @@ Guidance for AI agents working on this package. Read before changing code.
 PSR-18 link preview: `Fetch\Fetcher` (own redirect loop, `UrlPolicy` on every
 hop, size and content-type limits), `Html\PageDocument`, OpenGraph / Twitter
 Cards / HTML-fallback extractors, `PageInfo`, `Limits` and the
-`PreviewProvider` facade. Everything returns `Rasuvaeff\Result\Result` with an
+`PreviewProvider` facade, oEmbed / JSON-LD extractors and eleven site adapters
+(`Adapter/`). Everything returns `Rasuvaeff\Result\Result` with an
 enum failure. Namespace `Rasuvaeff\LinkPreview`.
 
 The agent skill ships in `resources/skills/rasuvaeff-link-preview/SKILL.md`
@@ -19,7 +20,7 @@ step with the public API.
 1. **Verification is mandatory.** Never claim "done" without a fresh green
    `composer build`. "Should work" does not count.
 2. **No suppressions.** No `@psalm-suppress`, no baseline. Fix the root cause.
-3. **UrlPolicy is the SSRF boundary.** Every URL that is fetched - first, redirect target - goes through `UrlPolicy::check()` before a request is made; never fetch around `Fetcher`, never weaken a range without a test, and never claim DNS-rebinding protection (pure PSR-18 cannot pin).
+3. **UrlPolicy is the SSRF boundary.** Adapters reach the network only through `AdapterContext`; hosts are matched by labels (`HostMatcher`), tokens are headers to the API host only and never in URLs, failures or docs (`'<token>'`). Every URL that is fetched - first, redirect target - goes through `UrlPolicy::check()` before a request is made; never fetch around `Fetcher`, never weaken a range without a test, and never claim DNS-rebinding protection (pure PSR-18 cannot pin).
 4. **Preserve the public contract.** Update README + tests with any API change.
 
 ## Commands
@@ -49,6 +50,7 @@ make release-check
 ## Invariants & gotchas
 
 - `ext-intl` is required (IDN hosts); the stock `composer:2` image lacks it, so use `make image`.
+- Adapter fixtures in `tests/fixtures/adapters/` are written from documented formats, not recorded; `bin/record-preview-corpus --check` must stay green and `--record` needs `--live`.
 - Mutation gate `minMsi` is 90; PageCorpusTest fixtures in `tests/fixtures/` record page intent, edit them deliberately.
 - Code: `declare(strict_types=1)`, `final readonly class`, `#[\Override]`,
   explicit types.

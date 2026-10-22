@@ -8,7 +8,7 @@
 [![PHP](https://img.shields.io/packagist/dependency-v/rasuvaeff/link-preview/php)](https://packagist.org/packages/rasuvaeff/link-preview)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE.md)
 
-Link preview for PHP: fetch a user-supplied URL through any PSR-18 client with an SSRF-aware redirect loop, and read title, description, image, favicon and more from OpenGraph, Twitter Cards and plain HTML.
+Link preview for PHP: fetch a user-supplied URL through any PSR-18 client with an SSRF-aware redirect loop, and read title, description, image, favicon and more from oEmbed, JSON-LD, OpenGraph, Twitter Cards and plain HTML - with built-in adapters for eleven sites.
 
 > Using an AI coding assistant? [llms.txt](llms.txt) contains a compact API reference you can share with the model.
 
@@ -55,11 +55,13 @@ if ($result->isOk()) {
 }
 ```
 
-The pipeline is `Fetcher` (policy on every hop, size and content-type limits) -> `PageDocument` -> extractors -> fixed-priority merge -> `Limits` -> `PageInfo`. Every stage returns a `Result` with an enum failure; nothing throws on bad input from the network.
+The pipeline is `UrlPolicy` -> site adapter (YouTube, Wikipedia, ...) -> `Fetcher` (policy on every hop, size and content-type limits) -> `PageDocument` -> extractors -> fixed-priority merge -> `Limits` -> `PageInfo`. Every stage returns a `Result` with an enum failure; nothing throws on bad input from the network.
 
 ### Sources and priority
 
-Each field is taken from the first source that has it: **OpenGraph**, then **Twitter Cards**, then **plain HTML**. Pass your own `extractors:` list (highest priority first) to change that.
+Each field is taken from the first source that has it, in this order: **site adapter**, **oEmbed** (discovered through `<link rel="alternate" type="application/json+oembed">`), **JSON-LD** (schema.org Article, VideoObject, WebPage, Organization), **OpenGraph**, **Twitter Cards**, **plain HTML**. Pass your own `extractors:` list (highest priority first, after the adapter) to change that.
+
+oEmbed discovery makes one extra request: the endpoint is an address chosen by the page, so it is fetched through the same `Fetcher` - same `UrlPolicy`, same redirect checks - and can never reach what the original URL could not. JSON-LD is read by a small built-in reader (`SimpleJsonLdReader`, behind the `JsonLdReader` interface so a full processor can replace it): only schema.org contexts are understood, a remote or inline `@context` is never fetched and the block is skipped.
 
 | Field | OpenGraph | Twitter Cards | HTML fallback |
 |---|---|---|---|
@@ -133,6 +135,41 @@ new PreviewProvider(fetcher: $fetcher, limits: new Limits(titleLength: 120, desc
 
 Text is scrubbed of invalid UTF-8 and control characters, whitespace runs collapse to one space, and what is still too long is cut by characters with a trailing `…` that counts toward the limit (defaults: title 200, description 500, site name 100, author 100). Applying `Limits` twice equals applying it once. An image or favicon longer than `maxUrlLength` (2048) is dropped; with `httpsImagesOnly` plain-http ones are dropped too (the next source is *not* consulted after the merge).
 
+### Site adapters
+
+`PreviewProvider` picks an adapter by the host of the URL (after the URL policy accepted it) and merges its answer in front of everything else. Hosts are matched label by label: `www.youtube.com` and `m.youtube.com` are YouTube, `youtube.com.evil.example` and `notyoutube.com` are not. If an adapter fails the generic extractors still run; if the page is unavailable too, a missing token is reported as `PreviewFailure::MissingToken`.
+
+| Site | Adapter | Mechanism | Needs |
+|---|---|---|---|
+| YouTube | `YouTubeAdapter` | oEmbed + embed URL from the video id | nothing |
+| TikTok | `TikTokAdapter` | oEmbed | nothing |
+| Twitter / X | `TwitterAdapter` | `publish.twitter.com/oembed`, post text as description | optional token |
+| Twitch | `TwitchAdapter` | oEmbed + player URL with `parent` | nothing (pass `parents:` to get an embed URL) |
+| Wikipedia | `WikipediaAdapter` | REST summary API of the link's own language | nothing |
+| GitHub | `GitHubAdapter` | OpenGraph of the page, gist aware | nothing |
+| Instagram | `InstagramAdapter` | Graph API `instagram_oembed` | **access token** |
+| Facebook | `FacebookAdapter` | Graph API `oembed_post` / `oembed_video` / `oembed_page` | **access token** |
+| Telegram | `TelegramAdapter` | OpenGraph + embed widget URL | nothing (`UserAgentMap` entry for `t.me` recommended) |
+| VK | `VkAdapter` | OpenGraph + `video_ext.php` player | nothing (`UserAgentMap` entry for `vk.com` recommended) |
+| Rutube | `RutubeAdapter` | video API JSON | nothing |
+
+```php
+use Rasuvaeff\LinkPreview\Adapter\AdapterRegistry;
+
+$provider = new PreviewProvider(
+    fetcher: $fetcher,
+    adapters: AdapterRegistry::standard(
+        instagramToken: '<token>',
+        facebookToken: '<token>',
+        twitchParents: ['example.com'],
+    ),
+);
+```
+
+Tokens are constructor arguments (`#[\SensitiveParameter]`), travel as an `Authorization: Bearer` header to the API host only (a redirect to another host drops them) and never appear in a URL, a failure or an exception. Without a token, Instagram and Facebook answer `AdapterFailure::MissingToken` without making any request. `new AdapterRegistry()` turns adapters off; implement `Adapter` to add a site.
+
+The fixtures behind the adapter tests are in `tests/fixtures/adapters/`: they are written from the services' documented response formats, not live recordings. `bin/record-preview-corpus --check` re-parses every committed entry (no network); `bin/record-preview-corpus --record=<name> --live` refreshes one entry's files from the real service, and `LINK_PREVIEW_LIVE=1 vendor/bin/testo --suite=Integration` compares the real services with what the code expects.
+
 ### Public API
 
 | Class | Description |
@@ -145,7 +182,9 @@ Text is scrubbed of invalid UTF-8 and control characters, whitespace runs collap
 | `Fetch\UrlPolicy`, `UrlRejection` | SSRF policy |
 | `Fetch\UserAgentMap` | Host -> `User-Agent` |
 | `Html\PageDocument` | Read-only DOM view: `title()`, `meta()`, `links()`, `images()`, `language()`, `baseHref()` |
-| `Extract\Extractor`, `OpenGraphExtractor`, `TwitterCardsExtractor`, `HtmlFallbackExtractor` | Sources; return `Result<Metadata, ExtractFailure>` |
+| `Extract\Extractor`, `OEmbedExtractor`, `JsonLdExtractor`, `OpenGraphExtractor`, `TwitterCardsExtractor`, `HtmlFallbackExtractor` | Sources; return `Result<Metadata, ExtractFailure>` |
+| `Extract\JsonLdReader`, `SimpleJsonLdReader`, `JsonLdFailure` | Replaceable JSON-LD reader |
+| `Adapter\Adapter`, `AdapterRegistry`, `AdapterContext`, `AdapterFailure` | Site adapters and their registry; eleven built in |
 | `Extract\Metadata` | What one source knows (all fields optional) |
 
 ## Security
@@ -156,7 +195,8 @@ A link preview fetches a URL chosen by a user from inside your network. What the
 - Alternative IP spellings, IPv6-embedded IPv4, `localhost.`, userinfo tricks and control characters are rejected or classified as the address they really are.
 - The HTML is parsed with libxml (`LIBXML_NONET`), never executed; external entities are not loaded; scripts are text.
 - Response size is bounded; only HTML content types are read.
-- Every URL taken from the page is absolute http(s) without credentials.
+- Every URL taken from the page is absolute http(s) without credentials. An oEmbed endpoint named by a page is fetched under the same policy and redirect checks as the page; a JSON-LD `@context` is never fetched.
+- Adapter hosts are matched by labels, not substrings; adapter tokens are sent as headers to the API host only and never appear in URLs, failures or exceptions.
 
 What it cannot do, because PSR-18 does not give it the means:
 
@@ -179,6 +219,9 @@ documented public API.
 | `url_policy.php` | What `UrlPolicy` accepts and rejects, dev allowlist | No |
 | `redirects.php` | A redirect chain refused on the second hop | No |
 | `limits_merge.php` | Source priority, custom order and `Limits` | No |
+| `adapters_oembed.php` | YouTube, TikTok, Twitter/X, Twitch from recorded oEmbed answers | No |
+| `adapters_pages.php` | GitHub, Telegram, VK (page tags) and Wikipedia, Rutube (APIs) from recorded answers | No |
+| `adapters_tokens.php` | Instagram: the missing-token failure, then a configured token | No |
 | `live.php` | A real fetch with Guzzle, only when `LINK_PREVIEW_URL` is set | Yes (optional) |
 
 ## Development
