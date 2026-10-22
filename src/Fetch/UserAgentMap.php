@@ -16,6 +16,13 @@ final readonly class UserAgentMap
 {
     public const string DEFAULT = 'Mozilla/5.0 (compatible; rasuvaeff-link-preview/0.1; +https://github.com/rasuvaeff/link-preview)';
 
+    /**
+     * The name that link unfurlers (X, Telegram, Slack) send. Many sites serve the page with its metadata only to
+     * crawlers they know, and answer anything else with a login stub or an endless redirect loop (checked live:
+     * vk.com and championat.com). Honest, but only works where the site does not insist on its own name.
+     */
+    public const string UNFURLER = 'Twitterbot/1.0';
+
     /** @var array<non-empty-string, non-empty-string> */
     private array $byHost;
 
@@ -42,6 +49,16 @@ final readonly class UserAgentMap
         }
 
         $this->byHost = $normalized;
+    }
+
+    /**
+     * Presents itself as a link unfurler everywhere; `$byHost` still overrides single hosts.
+     *
+     * @param array<array-key, string> $byHost
+     */
+    public static function unfurler(array $byHost = []): self
+    {
+        return new self($byHost, self::UNFURLER);
     }
 
     public function forHost(string $host): string

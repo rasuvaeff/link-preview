@@ -106,6 +106,8 @@ Internationalised hosts become ASCII (`münchen.de` -> `xn--mnchen-3ya.de`). On 
 
 ### Fetcher
 
+Many sites serve metadata only to crawlers they know: checked live, `vk.com` answers the default name with an endless redirect loop and `championat.com` with a login stub. `UserAgentMap::unfurler()` presents `Twitterbot/1.0` everywhere (single hosts can still be overridden): pass it as `userAgents:` when you read arbitrary sites.
+
 ```php
 use Rasuvaeff\LinkPreview\Fetch\Fetcher;
 use Rasuvaeff\LinkPreview\Fetch\UserAgentMap;
@@ -149,8 +151,8 @@ Text is scrubbed of invalid UTF-8 and control characters, whitespace runs collap
 | GitHub | `GitHubAdapter` | OpenGraph of the page, gist aware | nothing |
 | Instagram | `InstagramAdapter` | Graph API `instagram_oembed` | **access token** |
 | Facebook | `FacebookAdapter` | Graph API `oembed_post` / `oembed_video` / `oembed_page` | **access token** |
-| Telegram | `TelegramAdapter` | OpenGraph + embed widget URL | nothing (`UserAgentMap` entry for `t.me` recommended) |
-| VK | `VkAdapter` | OpenGraph + `video_ext.php` player | nothing (`UserAgentMap` entry for `vk.com` recommended) |
+| Telegram | `TelegramAdapter` | OpenGraph + embed widget URL | nothing (`UserAgentMap::unfurler()` recommended) |
+| VK | `VkAdapter` | OpenGraph + `video_ext.php` player | nothing (**needs** `UserAgentMap::unfurler()`: with the default name VK answers with a redirect loop) |
 | Rutube | `RutubeAdapter` | video API JSON | nothing |
 
 ```php

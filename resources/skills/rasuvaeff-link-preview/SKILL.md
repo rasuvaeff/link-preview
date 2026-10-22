@@ -85,7 +85,7 @@ $provider = new PreviewProvider(
         client: new Client(['allow_redirects' => false, 'http_errors' => false, 'timeout' => 5.0]),
         requestFactory: new HttpFactory(),
         policy: new UrlPolicy(),
-        userAgents: new UserAgentMap(byHost: ['t.me' => 'TelegramBot (like TwitterBot)']),
+        userAgents: UserAgentMap::unfurler(['t.me' => 'TelegramBot (like TwitterBot)']),
         maxRedirects: 5,
         maxBodyBytes: 2_097_152,
         chainBudgetSeconds: 10.0,
@@ -119,7 +119,7 @@ No network (tests, stored HTML): `$provider->fromHtml(html: $html, pageUrl: $url
   `extractors:` list replaces the default; put the highest priority first.
   `new AdapterRegistry()` turns adapters off.
 - A failed adapter does not fail the preview; the generic extractors still
-  run. Telegram and VK need a `UserAgentMap` entry for their host.
+  run. VK answers the default name with a redirect loop and championat.com with a login stub: use `UserAgentMap::unfurler()` (`Twitterbot/1.0`) when reading arbitrary sites.
 - `Limits` drops an over-long or (with `httpsImagesOnly`) plain-http image
   after the merge; the next source is not consulted.
 - `PageInfo::$url` is `og:url`, else `canonical`, else the final fetched URL.

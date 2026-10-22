@@ -106,6 +106,8 @@ $dev = new UrlPolicy(allowedNetworks: ['10.20.0.0/16'], allowedPorts: [80, 443, 
 
 ### Fetcher
 
+Многие сайты отдают метаданные только знакомым краулерам: проверено вживую, `vk.com` отвечает на имя по умолчанию бесконечным циклом переадресаций, а `championat.com` страницей-заглушкой. `UserAgentMap::unfurler()` представляется везде как `Twitterbot/1.0` (отдельные хосты можно переопределить): передавайте его в `userAgents:`, когда читаете произвольные сайты.
+
 ```php
 use Rasuvaeff\LinkPreview\Fetch\Fetcher;
 use Rasuvaeff\LinkPreview\Fetch\UserAgentMap;
@@ -149,8 +151,8 @@ new PreviewProvider(fetcher: $fetcher, limits: new Limits(titleLength: 120, desc
 | GitHub | `GitHubAdapter` | OpenGraph страницы, с учётом gist | ничего |
 | Instagram | `InstagramAdapter` | Graph API `instagram_oembed` | **токен доступа** |
 | Facebook | `FacebookAdapter` | Graph API `oembed_post` / `oembed_video` / `oembed_page` | **токен доступа** |
-| Telegram | `TelegramAdapter` | OpenGraph + URL виджета | ничего (желательна запись `UserAgentMap` для `t.me`) |
-| VK | `VkAdapter` | OpenGraph + плеер `video_ext.php` | ничего (желательна запись `UserAgentMap` для `vk.com`) |
+| Telegram | `TelegramAdapter` | OpenGraph + URL виджета | ничего (желателен `UserAgentMap::unfurler()`) |
+| VK | `VkAdapter` | OpenGraph + плеер `video_ext.php` | ничего (**нужен** `UserAgentMap::unfurler()`: с именем по умолчанию VK отвечает циклом переадресаций) |
 | Rutube | `RutubeAdapter` | JSON video API | ничего |
 
 ```php

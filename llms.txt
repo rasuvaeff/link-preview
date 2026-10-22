@@ -34,7 +34,7 @@ $provider = new PreviewProvider(
         client: new Client(['allow_redirects' => false, 'http_errors' => false, 'timeout' => 5.0]),
         requestFactory: new HttpFactory(),
         policy: new UrlPolicy(allowedNetworks: [], allowedPorts: [80, 443]),
-        userAgents: new UserAgentMap(byHost: ['t.me' => 'TelegramBot (like TwitterBot)']),
+        userAgents: UserAgentMap::unfurler(['t.me' => 'TelegramBot (like TwitterBot)']), // Twitterbot/1.0 everywhere: VK and others refuse the default name
         maxRedirects: 5,
         maxBodyBytes: 2_097_152,
         chainBudgetSeconds: 10.0, // checked between hops only

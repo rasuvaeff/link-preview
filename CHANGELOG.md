@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- `UserAgentMap::unfurler()` (and `UserAgentMap::UNFURLER`): the unfurler name `Twitterbot/1.0` for every host with per-host overrides; checked live that VK and championat.com refuse the default name.
 - `UrlPolicy`: http(s)-only, port, public-IP and IDN policy with CIDR allowlist, no DNS resolution.
 - `Fetcher`: PSR-18 fetching with its own redirect loop (policy on every hop), redirect limit, between-hop budget, response size and content-type limits, per-host `UserAgentMap`.
 - `PageDocument`: read-only DOM view with charset detection.

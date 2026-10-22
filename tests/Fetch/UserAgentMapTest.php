@@ -79,4 +79,13 @@ final class UserAgentMapTest
 
         new UserAgentMap(byHost: ['.' => 'Bot/1']);
     }
+
+    public function theUnfurlerPresetUsesTheUnfurlerNameEverywhereAndKeepsOverrides(): void
+    {
+        $map = UserAgentMap::unfurler(['t.me' => 'TelegramBot (like TwitterBot)']);
+
+        Assert::same($map->forHost('vk.com'), UserAgentMap::UNFURLER);
+        Assert::same($map->forHost('www.championat.com'), 'Twitterbot/1.0');
+        Assert::same($map->forHost('t.me'), 'TelegramBot (like TwitterBot)');
+    }
 }
