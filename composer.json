@@ -44,6 +44,7 @@
         "guzzlehttp/psr7": "^2.7",
         "infection/infection": "^0.35",
         "maglnet/composer-require-checker": "^4.17",
+        "rasuvaeff/pinned-http-client": "^0.1",
         "rasuvaeff/property-testing-testo": "^1.0",
         "rasuvaeff/rector-named-literals": "^1.0",
         "rasuvaeff/understudy-testo": "^1.0",
@@ -55,7 +56,8 @@
         "vimeo/psalm": "^6.16"
     },
     "suggest": {
-        "guzzlehttp/guzzle": "A PSR-18 client + PSR-17 factories (alternatively symfony/http-client + nyholm/psr7)"
+        "guzzlehttp/guzzle": "A PSR-18 client + PSR-17 factories (alternatively symfony/http-client + nyholm/psr7)",
+        "rasuvaeff/pinned-http-client": "A PSR-18 client that pins the connection to the checked addresses (DNS rebinding protection) for the Fetcher"
     },
     "autoload": {
         "psr-4": {

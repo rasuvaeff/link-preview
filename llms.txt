@@ -12,7 +12,7 @@ composer require guzzlehttp/guzzle   # any PSR-18 client + PSR-17 request factor
 - PHP 8.3+, `declare(strict_types=1)`, ext dom/libxml/mbstring/intl/ctype/filter
 - Everything returns `Rasuvaeff\Result\Result` with an enum failure; nothing throws on bad network input
 - The PSR-18 client MUST NOT follow redirects (Guzzle `allow_redirects => false`): `Fetcher` follows them itself and applies `UrlPolicy` to every hop
-- No DNS pinning inside the package (PSR-18 has no hook); timeouts belong to the client; close rebinding with a trusted resolving egress proxy or with `examples/pinned_client.php` (Guzzle, CURLOPT_RESOLVE to the addresses UrlPolicy checked)
+- No DNS pinning inside the package (PSR-18 has no hook); timeouts belong to the client; close rebinding with `rasuvaeff/pinned-http-client` as the Fetcher's client (see `examples/with_pinned_client.php`) or a trusted resolving egress proxy
 - JSON-LD is read by `ProcessorJsonLdReader` over `rasuvaeff/json-ld` (a dependency): inline contexts and aliases work, the schema.org context is answered from memory, any other remote context skips the block; replace it through the `JsonLdReader` interface
 - Output URLs are absolute http(s) only; text is plain (escape it when rendering)
 - Source priority per field: site adapter > oEmbed (discovered) > JSON-LD > OpenGraph > Twitter Cards > HTML

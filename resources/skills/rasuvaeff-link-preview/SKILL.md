@@ -32,10 +32,11 @@ Cards and plain-HTML metadata. Namespace `Rasuvaeff\LinkPreview\`.
 
 3. **No DNS pinning in pure PSR-18.** `UrlPolicy` never resolves names, so a
    name pointing at an internal address passes and rebinding is possible.
-   Mitigate in the transport: a trusted resolving egress proxy that refuses
-   internal destinations, or a client-level connection hook applying the same
-   ranges to the connected address. Say so in reviews; do not claim the
-   package prevents it.
+   Mitigate in the transport: `rasuvaeff/pinned-http-client` as the Fetcher's
+   PSR-18 client (resolves, checks every address, pins the connection; see
+   `examples/with_pinned_client.php`), or a trusted resolving egress proxy that
+   refuses internal destinations. Say so in reviews; do not claim this package
+   prevents it on its own.
 
 4. **Bound everything.** `maxBodyBytes`, `maxRedirects`, `chainBudgetSeconds`
    (checked between hops only). PSR-18 has no timeout: set connect/read

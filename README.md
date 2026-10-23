@@ -211,7 +211,7 @@ A link preview fetches a URL chosen by a user from inside your network. What the
 
 What it cannot do, because PSR-18 does not give it the means:
 
-- **No DNS pinning in the package.** The policy never resolves names; a name that resolves to an internal address passes, and an attacker can rebind a name between the check and the connection. Close this in the transport: either send the client's traffic through a trusted resolving proxy (an egress proxy that refuses internal destinations, e.g. Smokescreen), or pin the connection yourself. [`examples/pinned_client.php`](examples/pinned_client.php) is a ready PSR-18 client over Guzzle that does the second: it resolves the host, checks every address with the same `UrlPolicy`, and passes the checked addresses to cURL (`CURLOPT_RESOLVE`), so the connection can only go where the check looked. A host with any non-public address is refused before a socket is opened; redirects are left to the `Fetcher`. (It is a recipe and not a class of the package because it needs Guzzle with the cURL handler; copy it into your application.)
+- **No DNS pinning in the package.** The policy never resolves names; a name that resolves to an internal address passes, and an attacker can rebind a name between the check and the connection. Close this in the transport: use [`rasuvaeff/pinned-http-client`](https://github.com/rasuvaeff/pinned-http-client) as the Fetcher's PSR-18 client (it resolves the host, checks every address and pins the connection with `CURLOPT_RESOLVE`; [`examples/with_pinned_client.php`](examples/with_pinned_client.php) feeds it the rules of your `UrlPolicy`), or send the client's traffic through a trusted resolving proxy (an egress proxy that refuses internal destinations, e.g. Smokescreen).
 - **The client must not follow redirects** (`allow_redirects => false` for Guzzle, `max_redirects => 0` for Symfony). A redirect followed inside the client skips the policy.
 - **Timeouts belong to the client.** PSR-18 has none; configure connect and read timeouts on the client. `chainBudgetSeconds` is checked between hops only and cannot interrupt a request in flight.
 - **Body size** is checked on the body the client returns; a client that buffers has already read it. Set a limit on the client too.
@@ -233,7 +233,7 @@ documented public API.
 | `adapters_oembed.php` | YouTube, TikTok, Twitter/X, Twitch from recorded oEmbed answers | No |
 | `adapters_pages.php` | GitHub, Telegram, VK (page tags) and Wikipedia, Rutube (APIs) from recorded answers | No |
 | `adapters_tokens.php` | Instagram: the missing-token failure, then a configured token | No |
-| `pinned_client.php` | A PSR-18 client with DNS pinning over Guzzle, refusing hosts with non-public addresses | No |
+| `with_pinned_client.php` | The Fetcher over `rasuvaeff/pinned-http-client` (DNS pinning), fed with the rules of `UrlPolicy`; needs the package | No |
 | `live.php` | A real fetch with Guzzle, only when `LINK_PREVIEW_URL` is set | Yes (optional) |
 
 ## Development
