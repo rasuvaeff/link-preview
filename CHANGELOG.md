@@ -5,9 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.1.1 — 2026-10-23
+
+- DNS pinning is now `rasuvaeff/pinned-http-client` (suggested, dev-required for the example): `examples/with_pinned_client.php` feeds it the rules of `UrlPolicy`; README and agent skill point to it instead of a recipe.
+
 ## 0.1.0 — 2026-10-23
 
-- `examples/pinned_client.php`: a PSR-18 client over Guzzle that pins the connection to the addresses checked by `UrlPolicy` (the one thing the package leaves to the application), with a README paragraph.
 - JSON-LD is read by `ProcessorJsonLdReader` on top of the new dependency `rasuvaeff/json-ld` (JSON-LD 1.1 expansion): inline contexts, aliases and compact IRIs work; the schema.org context is answered from memory (`SchemaOrgContextLoader`, internal), any other remote context skips the block, types and properties outside schema.org are dropped. Same previews as the former reader on 14 real-page blocks.
 - `UserAgentMap::unfurler()` (and `UserAgentMap::UNFURLER`): the unfurler name `Twitterbot/1.0` for every host with per-host overrides; checked live that VK and championat.com refuse the default name.
 - `UrlPolicy`: http(s)-only, port, public-IP and IDN policy with CIDR allowlist, no DNS resolution.
