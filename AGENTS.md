@@ -50,7 +50,7 @@ make release-check
 ## Invariants & gotchas
 
 - `ext-intl` is required (IDN hosts); the stock `composer:2` image lacks it, so use `make image`.
-- `rasuvaeff/json-ld` is a runtime dependency (the JSON-LD reader). Until it is published `composer.json` carries a path repository `../json-ld` with `versions: 0.1.0` (copy, not symlink); remove `repositories` once `^0.1` is on Packagist. The processor gets the schema.org context from `SchemaOrgContextLoader` and nothing else: never give it a loader that touches the network.
+- `rasuvaeff/json-ld` is a runtime dependency (the JSON-LD reader), from Packagist. The processor gets the schema.org context from `SchemaOrgContextLoader` and nothing else: never give it a loader that touches the network.
 - JSON answers are parsed with `Extract\Schemas` (`rasuvaeff/schema`, which brings `property-testing-core` into runtime - accepted by the owner); never echo input values into diagnostics.
 - Adapter fixtures in `tests/fixtures/adapters/` are written from documented formats, not recorded; `bin/record-preview-corpus --check` must stay green and `--record` needs `--live`.
 - Mutation gate `minMsi` is 90; PageCorpusTest fixtures in `tests/fixtures/` record page intent, edit them deliberately.
