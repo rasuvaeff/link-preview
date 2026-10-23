@@ -57,7 +57,8 @@ Cards and plain-HTML metadata. Namespace `Rasuvaeff\LinkPreview\`.
    applies) and never builds an endpoint from page content without the policy.
    oEmbed endpoints named by a page, and JSON-LD `@context` values, are
    untrusted: the endpoint goes through the same `Fetcher`, a remote
-   `@context` is never loaded.
+   `@context` is never loaded (JSON-LD is expanded by `rasuvaeff/json-ld`
+   through `ProcessorJsonLdReader`; the schema.org context comes from memory).
 
 8. **Tokens (Instagram/Facebook required, Twitter optional)** are constructor
    arguments marked `#[\SensitiveParameter]`, sent as an `Authorization`

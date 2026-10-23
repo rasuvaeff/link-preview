@@ -33,6 +33,7 @@
         "psr/http-client": "^1.0",
         "psr/http-factory": "^1.0",
         "psr/http-message": "^1.1 || ^2.0",
+        "rasuvaeff/json-ld": "^0.1",
         "rasuvaeff/result": "^1.0",
         "rasuvaeff/schema": "^0.4"
     },
@@ -56,6 +57,18 @@
     "suggest": {
         "guzzlehttp/guzzle": "A PSR-18 client + PSR-17 factories (alternatively symfony/http-client + nyholm/psr7)"
     },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../json-ld",
+            "options": {
+                "symlink": false,
+                "versions": {
+                    "rasuvaeff/json-ld": "0.1.0"
+                }
+            }
+        }
+    ],
     "autoload": {
         "psr-4": {
             "Rasuvaeff\\LinkPreview\\": "src/"

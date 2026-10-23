@@ -33,7 +33,7 @@ final readonly class JsonLdExtractor implements Extractor
 
     public function __construct(?JsonLdReader $reader = null)
     {
-        $this->reader = $reader ?? new SimpleJsonLdReader();
+        $this->reader = $reader ?? new ProcessorJsonLdReader();
     }
 
     #[\Override]

@@ -161,11 +161,29 @@ final class JsonLdExtractorTest
         yield 'remote context' => ['"https://evil.example/context.jsonld"'];
         yield 'look-alike of schema.org' => ['"https://schema.org.evil.example/"'];
         yield 'schema.org as a subdomain of evil' => ['"https://evil.example/schema.org"'];
-        yield 'inline definitions' => ['{"headline":"http://evil.example/x"}'];
-        yield 'list with a foreign entry' => ['["https://schema.org",{"headline":"http://evil.example/x"}]'];
         yield 'list with a remote entry' => ['["https://schema.org","https://evil.example/c"]'];
         yield 'number' => ['5'];
-        yield 'empty list' => ['[]'];
+    }
+
+    public function inlineDefinitionsOutsideSchemaOrgGiveNoSchemaOrgNode(): void
+    {
+        Assert::same($this->extract($this->block('{"@context":{"headline":"http://evil.example/x"},"@type":"Article","headline":"H"}'))->error(), ExtractFailure::NoMetadata);
+        Assert::same($this->extract($this->block('{"@context":[],"@type":"Article","headline":"H"}'))->error(), ExtractFailure::NoMetadata);
+    }
+
+    public function aTermRedefinedToAForeignIriIsNotRead(): void
+    {
+        $metadata = $this->extract($this->block('{"@context":["https://schema.org",{"headline":"http://evil.example/x"}],"@type":"Article","headline":"H","description":"D"}'))->unwrap();
+
+        Assert::null($metadata->title);
+        Assert::same($metadata->description, 'D');
+    }
+
+    public function anInlineVocabularyContextAndAliasesAreUnderstood(): void
+    {
+        $metadata = $this->extract($this->block('{"@context":{"@vocab":"https://schema.org/","title":"headline"},"@type":"NewsArticle","title":"Aliased"}'))->unwrap();
+
+        Assert::same($metadata->title, 'Aliased');
     }
 
     #[DataProvider('knownContextProvider')]
@@ -187,7 +205,7 @@ final class JsonLdExtractorTest
 
     public function aMissingContextIsNotSchemaOrg(): void
     {
-        Assert::same($this->extract($this->block('{"@type":"Article","headline":"H"}'))->error(), ExtractFailure::UnsupportedContext);
+        Assert::same($this->extract($this->block('{"@type":"Article","headline":"H"}'))->error(), ExtractFailure::NoMetadata);
     }
 
     public function aGoodBlockSurvivesABadOne(): void

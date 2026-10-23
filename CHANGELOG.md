@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-- Documented and exampled the two things the package leaves to the application: `examples/pinned_client.php` (a PSR-18 client over Guzzle that pins the connection to the addresses checked by `UrlPolicy`, tested against `localhost` and the metadata address) and `examples/json_ld_processor.php` (a `JsonLdReader` on top of `rasuvaeff/json-ld`; same previews as the built-in reader on 14 real-page blocks, and it also reads inline contexts and aliases).
+- `examples/pinned_client.php`: a PSR-18 client over Guzzle that pins the connection to the addresses checked by `UrlPolicy` (the one thing the package leaves to the application), with a README paragraph.
+- JSON-LD is read by `ProcessorJsonLdReader` on top of the new dependency `rasuvaeff/json-ld` (JSON-LD 1.1 expansion): inline contexts, aliases and compact IRIs work; the schema.org context is answered from memory (`SchemaOrgContextLoader`, internal), any other remote context skips the block, types and properties outside schema.org are dropped. Same previews as the former reader on 14 real-page blocks.
 - `UserAgentMap::unfurler()` (and `UserAgentMap::UNFURLER`): the unfurler name `Twitterbot/1.0` for every host with per-host overrides; checked live that VK and championat.com refuse the default name.
 - `UrlPolicy`: http(s)-only, port, public-IP and IDN policy with CIDR allowlist, no DNS resolution.
 - `Fetcher`: PSR-18 fetching with its own redirect loop (policy on every hop), redirect limit, between-hop budget, response size and content-type limits, per-host `UserAgentMap`.
@@ -15,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `OpenGraphExtractor`, `TwitterCardsExtractor`, `HtmlFallbackExtractor` returning `Result`.
 - `PageInfo`, `Limits`, `PreviewProvider` facade with fixed-priority merge.
 - `OEmbedExtractor`: oEmbed discovery; the endpoint a page names is fetched under the same `UrlPolicy` and redirect checks as the page.
-- `JsonLdExtractor` with a replaceable `JsonLdReader` (built-in `SimpleJsonLdReader`, schema.org contexts only, nothing remote is ever loaded).
+- `JsonLdExtractor` with a replaceable `JsonLdReader` (default `ProcessorJsonLdReader`; nothing remote is ever loaded).
 - `Fetcher::fetchJson()` and `Fetcher::check()`; custom request headers go to the first host only.
 - Site adapters behind `Adapter` / `AdapterRegistry`: YouTube, TikTok, Twitter/X, Twitch, Wikipedia, GitHub, Instagram, Facebook, Telegram, VK, Rutube. Hosts are matched label by label; Instagram and Facebook require an access token and fail with `MissingToken` without one.
 - JSON answers of oEmbed, Wikipedia and Rutube are parsed with `rasuvaeff/schema` (`Extract\Schemas`); `AdapterContext::diagnostics()` reports unreadable shapes without values.

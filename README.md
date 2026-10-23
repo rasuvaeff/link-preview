@@ -20,7 +20,7 @@ Russian version: [README.ru.md](README.ru.md).
 
 - PHP 8.3-8.5 (8.6 is checked in CI as experimental) with `dom`, `libxml`, `mbstring`, `intl`, `ctype`, `filter`
 - `psr/http-client`, `psr/http-factory`, `psr/http-message`
-- `rasuvaeff/result`, `rasuvaeff/schema` (reads the JSON answers of oEmbed, Wikipedia and Rutube; pulls `rasuvaeff/property-testing-core` in at runtime)
+- `rasuvaeff/json-ld` (the JSON-LD 1.1 processor behind the JSON-LD source), `rasuvaeff/result`, `rasuvaeff/schema` (reads the JSON answers of oEmbed, Wikipedia and Rutube; pulls `rasuvaeff/property-testing-core` in at runtime)
 - A PSR-18 client and PSR-17 request factory of your choice (Guzzle, Symfony HttpClient + Nyholm PSR-7, ...)
 
 ## Installation
@@ -61,11 +61,13 @@ The pipeline is `UrlPolicy` -> site adapter (YouTube, Wikipedia, ...) -> `Fetche
 
 Each field is taken from the first source that has it, in this order: **site adapter**, **oEmbed** (discovered through `<link rel="alternate" type="application/json+oembed">`), **JSON-LD** (schema.org Article, VideoObject, WebPage, Organization), **OpenGraph**, **Twitter Cards**, **plain HTML**. Pass your own `extractors:` list (highest priority first, after the adapter) to change that.
 
-oEmbed discovery makes one extra request: the endpoint is an address chosen by the page, so it is fetched through the same `Fetcher` - same `UrlPolicy`, same redirect checks - and can never reach what the original URL could not. JSON-LD is read by a small built-in reader (`SimpleJsonLdReader`, behind the `JsonLdReader` interface so a full processor can replace it): only schema.org contexts are understood, a remote or inline `@context` is never fetched and the block is skipped.
+oEmbed discovery makes one extra request: the endpoint is an address chosen by the page, so it is fetched through the same `Fetcher` - same `UrlPolicy`, same redirect checks - and can never reach what the original URL could not. JSON-LD is read by `ProcessorJsonLdReader` (behind the `JsonLdReader` interface, so you can replace it): the block is expanded by the JSON-LD 1.1 processor of [`rasuvaeff/json-ld`](https://github.com/rasuvaeff/json-ld), the schema.org properties are mapped back to the short names the extractor reads. See *JSON-LD* below.
 
-#### A full JSON-LD processor
+#### JSON-LD
 
-The built-in reader is a convenience, not a processor: it understands pages whose `@context` is a schema.org URL and skips every other block (an inline context, aliases such as `"title": "headline"`, compact IRIs). When that matters, implement `JsonLdReader` on top of [`rasuvaeff/json-ld`](https://github.com/rasuvaeff/json-ld), a JSON-LD 1.1 processor that does no I/O of its own: it expands the block and loads a remote context only through a loader you give it. [`examples/json_ld_processor.php`](examples/json_ld_processor.php) is a complete reader (about 100 lines, runnable): a loader that answers for schema.org and refuses everything else, the expansion, and the mapping of the expanded schema.org IRIs back to the short names the extractor reads. Pass it as `new JsonLdExtractor(new ProcessorJsonLdReader())` in `extractors:`. On 14 JSON-LD blocks collected from real pages (Wikipedia, YouTube, BBC, The New York Times, IMDb, Kommersant, Championat and others) it gives exactly the same previews as the built-in reader, and it also reads the blocks the built-in reader skips.
+`ProcessorJsonLdReader` expands every `<script type="application/ld+json">` block with `rasuvaeff/json-ld`, so inline contexts, aliases (`"title": "headline"`) and compact IRIs work, together with `@graph`, lists, several types and `{"@id": ...}` references between nodes of one block. Nothing is fetched from the network: the `https://schema.org` context (any spelling: `http`, `www`, `/docs/jsonldcontext.json`) is answered from memory, with its `schema:` prefix; any other remote context makes the block `UnsupportedContext` and it is skipped. A type or a property outside schema.org is dropped, so a term redefined to a foreign IRI (`{"headline": "http://evil.example/x"}`) is not read. Input nested deeper than 32 levels is refused before the processor sees it. Tested on 14 blocks collected from real pages (Wikipedia, YouTube, BBC, The New York Times, IMDb, Kommersant, Championat and others).
+
+To read JSON-LD some other way, implement `JsonLdReader` (`nodes(string $json): Result<list<array<string, mixed>>, JsonLdFailure>`: schema.org nodes with short property names, no I/O of its own) and pass `new JsonLdExtractor(new YourReader())` in `extractors:`.
 
 | Field | OpenGraph | Twitter Cards | HTML fallback |
 |---|---|---|---|
@@ -192,7 +194,7 @@ The fixtures behind the adapter tests are in `tests/fixtures/adapters/`: they ar
 | `Html\PageDocument` | Read-only DOM view: `title()`, `meta()`, `links()`, `images()`, `language()`, `baseHref()` |
 | `Extract\Extractor`, `OEmbedExtractor`, `JsonLdExtractor`, `OpenGraphExtractor`, `TwitterCardsExtractor`, `HtmlFallbackExtractor` | Sources; return `Result<Metadata, ExtractFailure>` |
 | `Extract\Schemas` | `rasuvaeff/schema` schemas of the JSON answers |
-| `Extract\JsonLdReader`, `SimpleJsonLdReader`, `JsonLdFailure` | Replaceable JSON-LD reader |
+| `Extract\JsonLdReader`, `ProcessorJsonLdReader`, `JsonLdFailure` | Replaceable JSON-LD reader; the default is built on `rasuvaeff/json-ld` |
 | `Adapter\Adapter`, `AdapterRegistry`, `AdapterContext`, `AdapterFailure` | Site adapters and their registry; eleven built in |
 | `Extract\Metadata` | What one source knows (all fields optional) |
 
@@ -231,7 +233,6 @@ documented public API.
 | `adapters_oembed.php` | YouTube, TikTok, Twitter/X, Twitch from recorded oEmbed answers | No |
 | `adapters_pages.php` | GitHub, Telegram, VK (page tags) and Wikipedia, Rutube (APIs) from recorded answers | No |
 | `adapters_tokens.php` | Instagram: the missing-token failure, then a configured token | No |
-| `json_ld_processor.php` | A JSON-LD 1.1 processor behind `JsonLdReader` (needs `rasuvaeff/json-ld`; says so and exits without it) | No |
 | `pinned_client.php` | A PSR-18 client with DNS pinning over Guzzle, refusing hosts with non-public addresses | No |
 | `live.php` | A real fetch with Guzzle, only when `LINK_PREVIEW_URL` is set | Yes (optional) |
 

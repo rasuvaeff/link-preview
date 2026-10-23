@@ -9,7 +9,7 @@ use Rasuvaeff\Result\Result;
 /**
  * Turns the text of a `<script type="application/ld+json">` block into schema.org
  * node objects. {@see JsonLdExtractor} depends on this interface only, so the
- * built-in {@see SimpleJsonLdReader} can be replaced by a full JSON-LD processor
+ * built-in {@see ProcessorJsonLdReader} (the processor of `rasuvaeff/json-ld`) can be replaced
  * without touching the extractor or the public API.
  *
  * An implementation must not perform I/O on its own: a remote `@context` is
