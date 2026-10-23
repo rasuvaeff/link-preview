@@ -46,7 +46,7 @@ final readonly class OEmbedSupport
         $metadata = OEmbedResponse::parse(json: $response->unwrap()->body, baseUrl: $endpoint);
 
         if ($metadata->isErr()) {
-            $context->note('oEmbed ' . (string) $metadata->error());
+            $context->note('oEmbed ' . ($metadata->error() ?? ''));
 
             return Result::err(error: AdapterFailure::InvalidResponse);
         }
@@ -78,8 +78,14 @@ final readonly class OEmbedSupport
         $parts = parse_url($url);
         $parsed = [];
         parse_str($parts['query'] ?? '', $parsed);
-        $strings = array_filter($parsed, 'is_string');
-        $query = array_combine(array_map('strval', array_keys($strings)), $strings);
+        $query = [];
+
+        /** @var scalar|array<array-key, mixed>|null $value */
+        foreach ($parsed as $name => $value) {
+            if (\is_string($value)) {
+                $query[(string) $name] = $value;
+            }
+        }
 
         return [
             'host' => strtolower($parts['host'] ?? ''),

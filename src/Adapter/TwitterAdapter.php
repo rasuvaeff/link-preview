@@ -50,7 +50,7 @@ final readonly class TwitterAdapter implements Adapter
         $service = OEmbedResponse::parse(json: $body, baseUrl: self::ENDPOINT);
 
         if ($service->isErr()) {
-            $context->note('oEmbed ' . (string) $service->error());
+            $context->note('oEmbed ' . ($service->error() ?? ''));
 
             return Result::err(error: AdapterFailure::InvalidResponse);
         }

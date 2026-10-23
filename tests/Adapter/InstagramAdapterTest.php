@@ -57,7 +57,7 @@ final class InstagramAdapterTest
         $result = (new InstagramAdapter(accessToken: 'secret-token'))->preview(self::URL, Adapters::context($client));
 
         Assert::same($result->error(), AdapterFailure::Unavailable);
-        Assert::false(str_contains(var_export($result, true), 'secret-token'));
+        Assert::false(str_contains(var_export($result, return: true), 'secret-token'));
     }
 
     public function unreadableAnswerIsReported(): void

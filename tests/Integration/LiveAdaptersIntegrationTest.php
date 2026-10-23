@@ -28,7 +28,7 @@ final class LiveAdaptersIntegrationTest
     public function previewsARealPage(string $url): void
     {
         if (getenv('LINK_PREVIEW_LIVE') !== '1') {
-            Assert::true(true);
+            Assert::true(actual: true);
 
             return;
         }

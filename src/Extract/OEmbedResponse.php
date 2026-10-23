@@ -34,7 +34,7 @@ final readonly class OEmbedResponse
 
         $metadata = self::fromData($data->unwrap(), $baseUrl);
 
-        return $metadata === null ? Result::err(error: '$: nothing to show') : Result::ok(value: $metadata);
+        return $metadata instanceof \Rasuvaeff\LinkPreview\Extract\Metadata ? Result::ok(value: $metadata) : Result::err(error: '$: nothing to show');
     }
 
     /**

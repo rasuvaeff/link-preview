@@ -26,7 +26,6 @@ final readonly class PageDocument
     private const int SNIFF_BYTES = 4096;
 
     private function __construct(
-        private DOMDocument $document,
         private DOMXPath $xpath,
     ) {}
 
@@ -40,7 +39,7 @@ final readonly class PageDocument
 
         if (trim($utf8) !== '') {
             $utf8 = self::withUtf8Meta($utf8);
-            $previous = libxml_use_internal_errors(true);
+            $previous = libxml_use_internal_errors(use_errors: true);
 
             try {
                 $document->loadHTML('<?xml encoding="UTF-8"?>' . $utf8, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
@@ -50,7 +49,7 @@ final readonly class PageDocument
             }
         }
 
-        return new self($document, new DOMXPath($document));
+        return new self(new DOMXPath($document));
     }
 
     public function title(): ?string
@@ -159,7 +158,7 @@ final readonly class PageDocument
             if (
                 $href !== ''
                 && strtolower(trim($link->getAttribute('type'))) === $type
-                && \in_array('alternate', $tokens === false ? [] : $tokens, true)
+                && \in_array('alternate', $tokens === false ? [] : $tokens, strict: true)
             ) {
                 $hrefs[] = $href;
             }
@@ -182,7 +181,7 @@ final readonly class PageDocument
             $tokens = preg_split('/\s+/', strtolower(trim($link->getAttribute('rel'))), -1, PREG_SPLIT_NO_EMPTY);
             $href = trim($link->getAttribute('href'));
 
-            if ($href !== '' && \in_array($rel, $tokens === false ? [] : $tokens, true)) {
+            if ($href !== '' && \in_array($rel, $tokens === false ? [] : $tokens, strict: true)) {
                 $hrefs[] = $href;
             }
         }
@@ -208,8 +207,8 @@ final readonly class PageDocument
 
             $images[] = [
                 'src' => $src,
-                'width' => self::dimension($image->getAttribute('width')),
-                'height' => self::dimension($image->getAttribute('height')),
+                'width' => $this->dimension($image->getAttribute('width')),
+                'height' => $this->dimension($image->getAttribute('height')),
             ];
         }
 
@@ -240,7 +239,7 @@ final readonly class PageDocument
     /**
      * @return int<0, max>|null
      */
-    private static function dimension(string $value): ?int
+    private function dimension(string $value): ?int
     {
         return preg_match('/\A\s*(\d{1,6})(?:px)?\s*\z/', $value, $matches) === 1 ? max(0, (int) $matches[1]) : null;
     }
@@ -285,9 +284,11 @@ final readonly class PageDocument
         };
 
         try {
-            return (string) mb_convert_encoding($html, 'UTF-8', $charset);
+            $converted = mb_convert_encoding($html, 'UTF-8', $charset);
         } catch (ValueError) {
-            return (string) mb_convert_encoding($html, 'UTF-8', 'UTF-8');
+            $converted = mb_convert_encoding($html, 'UTF-8', 'UTF-8');
         }
+
+        return $converted === false ? '' : $converted;
     }
 }

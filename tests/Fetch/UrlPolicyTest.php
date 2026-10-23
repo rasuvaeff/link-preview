@@ -210,7 +210,7 @@ final class UrlPolicyTest
         $url = $scheme . '://' . $a . '.' . $b . '.' . $c . '.' . $d . ($port === null ? '' : ':' . $port) . '/';
         $blocked = UrlGenerators::isBlockedIpv4($a, $b, $c, $d);
         $expected = ($scheme === 'http' || $scheme === 'https')
-            && ($port === null || $port === 80 || $port === 443)
+            && (in_array($port, [null, 80, 443], strict: true))
             && !$blocked;
 
         Assert::same((new UrlPolicy())->check(url: $url)->isOk(), $expected);
@@ -218,7 +218,7 @@ final class UrlPolicyTest
         Classify::cover(condition: $expected, label: 'accepted', minPercent: 4.0);
         Classify::cover(condition: $blocked && ($scheme === 'http' || $scheme === 'https'), label: 'blocked address', minPercent: 4.0);
         Classify::cover(condition: !$blocked && $port !== null && $port !== 80 && $port !== 443, label: 'refused port', minPercent: 4.0);
-        Classify::cover(condition: !$blocked && ($scheme === 'ftp' || $scheme === 'file' || $scheme === 'gopher'), label: 'refused scheme', minPercent: 5.0);
+        Classify::cover(condition: !$blocked && (in_array($scheme, ['ftp', 'file', 'gopher'], strict: true)), label: 'refused scheme', minPercent: 5.0);
     }
 
     /** @return iterable<string, array{int, int, int, int, string, int|null}> */

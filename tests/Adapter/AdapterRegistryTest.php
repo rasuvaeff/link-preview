@@ -29,7 +29,7 @@ final class AdapterRegistryTest
     {
         $adapter = AdapterRegistry::standard()->find($host);
 
-        Assert::same($adapter === null ? null : $adapter::class, $class);
+        Assert::same($adapter instanceof \Rasuvaeff\LinkPreview\Adapter\Adapter ? $adapter::class : null, $class);
     }
 
     public static function hostProvider(): iterable
@@ -103,9 +103,9 @@ final class AdapterRegistryTest
     {
         $host = AdapterHostGenerators::host($domain, $kind, $label);
         $found = AdapterRegistry::standard()->find($host);
-        $genuine = \in_array($kind, AdapterHostGenerators::GENUINE, true);
+        $genuine = \in_array($kind, AdapterHostGenerators::GENUINE, strict: true);
 
-        Assert::same($found === null ? null : $found::class, $genuine ? AdapterHostGenerators::OWNER[$domain] : null);
+        Assert::same($found instanceof \Rasuvaeff\LinkPreview\Adapter\Adapter ? $found::class : null, $genuine ? AdapterHostGenerators::OWNER[$domain] : null);
 
         Classify::cover(condition: $genuine, label: 'genuine host', minPercent: 30.0);
         Classify::cover(condition: !$genuine, label: 'look-alike host', minPercent: 30.0);

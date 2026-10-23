@@ -303,7 +303,7 @@ final class PageDocumentTest
 
     public function leavesInternalErrorHandlingDisabledWhenItWas(): void
     {
-        $before = libxml_use_internal_errors(false);
+        $before = libxml_use_internal_errors(use_errors: false);
 
         try {
             PageDocument::parse('<p><nonsense></p></div>');
@@ -317,7 +317,7 @@ final class PageDocumentTest
 
     public function leavesInternalErrorHandlingEnabledWhenItWas(): void
     {
-        $before = libxml_use_internal_errors(true);
+        $before = libxml_use_internal_errors(use_errors: true);
 
         try {
             PageDocument::parse('<p><nonsense></p></div>');

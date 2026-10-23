@@ -48,7 +48,7 @@ final readonly class UrlPolicy
         foreach ($allowedNetworks as $rule) {
             $cidr = Cidr::parse($rule);
 
-            if ($cidr === null) {
+            if (!$cidr instanceof \Rasuvaeff\LinkPreview\Url\Cidr) {
                 throw new InvalidArgumentException(\sprintf('Invalid network "%s"', $rule));
             }
 
@@ -95,7 +95,7 @@ final readonly class UrlPolicy
 
         $port = $parts['port'] ?? null;
 
-        if ($port !== null && !\in_array($port, $this->allowedPorts, true)) {
+        if ($port !== null && !\in_array($port, $this->allowedPorts, strict: true)) {
             return Result::err(error: UrlRejection::Port);
         }
 

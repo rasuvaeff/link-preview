@@ -56,7 +56,7 @@ final readonly class AdapterCorpus
         $json = file_get_contents(self::DIRECTORY . '/manifest.json');
 
         /** @var list<Entry> $entries */
-        $entries = $json === false ? throw new RuntimeException('Missing adapter manifest') : json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+        $entries = $json === false ? throw new RuntimeException('Missing adapter manifest') : json_decode($json, associative: true, depth: 512, flags: JSON_THROW_ON_ERROR);
 
         return $entries;
     }
@@ -84,7 +84,7 @@ final readonly class AdapterCorpus
                 twitterToken: \is_string($options['twitterToken'] ?? null) ? $options['twitterToken'] : null,
                 instagramToken: \is_string($options['instagramToken'] ?? null) ? $options['instagramToken'] : null,
                 facebookToken: \is_string($options['facebookToken'] ?? null) ? $options['facebookToken'] : null,
-                twitchParents: \is_array($parents) ? array_values(array_filter($parents, 'is_string')) : [],
+                twitchParents: \is_array($parents) ? array_values(array_filter($parents, is_string(...))) : [],
             ),
         );
 

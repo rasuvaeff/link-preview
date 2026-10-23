@@ -26,7 +26,7 @@ final readonly class Json
     {
         try {
             /** @var JsonValue $data */
-            $data = json_decode($json, true, self::DEPTH, JSON_THROW_ON_ERROR);
+            $data = json_decode($json, associative: true, depth: self::DEPTH, flags: JSON_THROW_ON_ERROR);
         } catch (JsonException) {
             return null;
         }

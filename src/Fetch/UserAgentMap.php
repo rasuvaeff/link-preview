@@ -33,12 +33,12 @@ final readonly class UserAgentMap
         array $byHost = [],
         private string $default = self::DEFAULT,
     ) {
-        self::assertValid($default);
+        $this->assertValid($default);
 
         $normalized = [];
 
         foreach ($byHost as $host => $agent) {
-            self::assertValid($agent);
+            $this->assertValid($agent);
             $key = strtolower(trim((string) $host, '.'));
 
             if ($key === '') {
@@ -86,7 +86,7 @@ final readonly class UserAgentMap
      * @phpstan-assert non-empty-string $agent
      * @psalm-assert non-empty-string $agent
      */
-    private static function assertValid(string $agent): void
+    private function assertValid(string $agent): void
     {
         if ($agent === '' || preg_match('/[\x00-\x1F\x7F]/', $agent) === 1) {
             throw new InvalidArgumentException('User agent must be a non-empty single-line string');

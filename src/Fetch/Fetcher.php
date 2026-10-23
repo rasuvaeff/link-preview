@@ -133,13 +133,13 @@ final readonly class Fetcher
 
             $response = $this->send($url, $host, $json, $host === $origin ? $headers : []);
 
-            if ($response === null) {
+            if (!$response instanceof \Psr\Http\Message\ResponseInterface) {
                 return Result::err(error: FetchFailure::Network);
             }
 
             $status = $response->getStatusCode();
 
-            if (!\in_array($status, self::REDIRECTS, true)) {
+            if (!\in_array($status, self::REDIRECTS, strict: true)) {
                 return $this->page($url, $response, $redirects, $json);
             }
 
@@ -205,7 +205,7 @@ final readonly class Fetcher
 
         $accepted = $json
             ? $mediaType === 'application/json' || str_ends_with($mediaType, '+json')
-            : \in_array($mediaType, self::HTML_TYPES, true);
+            : \in_array($mediaType, self::HTML_TYPES, strict: true);
 
         if (!$accepted) {
             return Result::err(error: FetchFailure::NotHtml);

@@ -55,7 +55,7 @@ final class AdapterCorpusTest
         $names = array_map(static fn(array $entry): string => preg_replace('/-.*/', '', $entry['name']) ?? '', AdapterCorpus::entries());
 
         foreach (['youtube', 'tiktok', 'twitter', 'twitch', 'wikipedia', 'github', 'instagram', 'facebook', 'telegram', 'vk', 'rutube'] as $adapter) {
-            Assert::true(\in_array($adapter, $names, true));
+            Assert::true(\in_array($adapter, $names, strict: true));
         }
     }
 }

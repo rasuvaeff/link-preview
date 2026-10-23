@@ -88,7 +88,7 @@ final class BlockedRanges
     {
         $prefix = substr($packed, 0, 12);
 
-        if ($prefix === self::COMPATIBLE_PREFIX || $prefix === self::MAPPED_PREFIX || $prefix === self::NAT64_PREFIX) {
+        if (in_array($prefix, [self::COMPATIBLE_PREFIX, self::MAPPED_PREFIX, self::NAT64_PREFIX], strict: true)) {
             return substr($packed, 12);
         }
 

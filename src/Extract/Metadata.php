@@ -44,7 +44,7 @@ final readonly class Metadata
             && $this->siteName === null
             && $this->language === null
             && $this->authorName === null
-            && $this->publishedTime === null
+            && !$this->publishedTime instanceof \DateTimeImmutable
             && $this->type === null
             && $this->embedUrl === null;
     }

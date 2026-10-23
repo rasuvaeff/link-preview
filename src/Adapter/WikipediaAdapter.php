@@ -45,7 +45,7 @@ final readonly class WikipediaAdapter implements Adapter
         $parsed = Schemas::parse(Schemas::wikipediaSummary(), $response->unwrap()->body);
 
         if ($parsed->isErr()) {
-            $context->note('Wikipedia summary ' . (string) $parsed->error());
+            $context->note('Wikipedia summary ' . ($parsed->error() ?? ''));
 
             return Result::err(error: AdapterFailure::InvalidResponse);
         }

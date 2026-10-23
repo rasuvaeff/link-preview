@@ -36,7 +36,7 @@ final class YouTubeAdapterTest
     #[DataProvider('videoUrlProvider')]
     public function buildsTheEmbedFromTheVideoId(string $url, ?string $embed): void
     {
-        $client = Http::client([]);
+        Http::client([]);
         $routes = Http::sequence(Adapters::json(Adapters::fixture('youtube/oembed.json')));
 
         $metadata = (new YouTubeAdapter())->preview($url, Adapters::context($routes))->unwrap();

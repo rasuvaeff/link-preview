@@ -40,7 +40,7 @@ final readonly class RutubeAdapter implements Adapter
         $parsed = Schemas::parse(Schemas::rutubeVideo(), $response->unwrap()->body);
 
         if ($parsed->isErr()) {
-            $context->note('Rutube video ' . (string) $parsed->error());
+            $context->note('Rutube video ' . ($parsed->error() ?? ''));
 
             return Result::err(error: AdapterFailure::InvalidResponse);
         }

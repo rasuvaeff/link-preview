@@ -123,9 +123,9 @@ final readonly class PreviewProvider
      */
     private function build(?Metadata $first, ?PageDocument $document, string $pageUrl): Result
     {
-        $found = $first === null ? [] : [$first];
+        $found = $first instanceof \Rasuvaeff\LinkPreview\Extract\Metadata ? [$first] : [];
 
-        if ($document !== null) {
+        if ($document instanceof \Rasuvaeff\LinkPreview\Html\PageDocument) {
             foreach ($this->extractors as $extractor) {
                 $metadata = $extractor->extract(document: $document, pageUrl: $pageUrl)->value();
 
