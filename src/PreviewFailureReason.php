@@ -24,6 +24,8 @@ enum PreviewFailureReason: string
     case HttpStatus = 'http_status';
     case UnexpectedContentType = 'unexpected_content_type';
     case TooLarge = 'too_large';
+    /** a media fetch answered 2xx with an empty body ({@see \Rasuvaeff\LinkPreview\Fetch\Fetcher::fetchMedia()}) */
+    case EmptyBody = 'empty_body';
     /** the site's adapter needs an access token that was not configured, and the page itself was unavailable */
     case MissingToken = 'missing_token';
     /** the page was fetched but no extractor found anything in it */
@@ -41,6 +43,7 @@ enum PreviewFailureReason: string
             FetchFailureReason::HttpStatus => self::HttpStatus,
             FetchFailureReason::UnexpectedContentType => self::UnexpectedContentType,
             FetchFailureReason::TooLarge => self::TooLarge,
+            FetchFailureReason::EmptyBody => self::EmptyBody,
         };
     }
 }

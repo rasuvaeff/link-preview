@@ -162,7 +162,7 @@ final readonly class PreviewProvider implements LinkPreviewer
             description: $merged->description,
             image: $merged->image,
             favicon: $merged->favicon,
-            siteName: $merged->siteName ?? ($this->hostAsSiteName ? $this->host($pageUrl) : null),
+            siteName: $merged->siteName ?? $merged->providerName ?? ($this->hostAsSiteName ? $this->host($pageUrl) : null),
             language: $merged->language,
             authorName: $merged->authorName,
             publishedTime: $merged->publishedTime,

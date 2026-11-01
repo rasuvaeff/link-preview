@@ -37,5 +37,9 @@ enum FetchFailureReason: string
     /** the response is not of the media type asked for (HTML for pages, JSON for APIs, the listed types for media) */
     case UnexpectedContentType = 'unexpected_content_type';
 
+    /** the client's own body limit or `maxBytes` was passed (a pinning client's limit included) */
     case TooLarge = 'too_large';
+
+    /** {@see Fetcher::fetchMedia()} only: a 2xx answer with an empty body */
+    case EmptyBody = 'empty_body';
 }

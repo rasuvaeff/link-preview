@@ -15,3 +15,4 @@
 /build export-ignore
 /Makefile export-ignore
 /bin export-ignore
+/composer-require-checker.json export-ignore

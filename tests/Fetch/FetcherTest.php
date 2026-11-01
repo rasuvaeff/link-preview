@@ -16,6 +16,7 @@ use Rasuvaeff\LinkPreview\Fetch\RetryAfter;
 use Rasuvaeff\LinkPreview\Fetch\Transience;
 use Rasuvaeff\LinkPreview\Fetch\UrlPolicy;
 use Rasuvaeff\LinkPreview\Fetch\UserAgentMap;
+use Rasuvaeff\LinkPreview\PreviewFailureReason;
 use Rasuvaeff\LinkPreview\Tests\Support\Adapters;
 use Rasuvaeff\LinkPreview\Tests\Support\Http;
 use Rasuvaeff\PropertyTesting\Classify;
@@ -623,6 +624,30 @@ final class FetcherTest
         Assert::same($fetcher->fetchMedia(url: 'https://cdn.example.com/big', acceptedTypes: ['image/png'], maxBytes: 10)->error()?->reason, FetchFailureReason::TooLarge);
         Assert::same($fetcher->fetchMedia(url: 'https://cdn.example.com/declared', acceptedTypes: ['image/png'], maxBytes: 10)->error()?->reason, FetchFailureReason::TooLarge);
         Assert::same($fetcher->fetchMedia(url: 'https://cdn.example.com/fits', acceptedTypes: ['image/png'], maxBytes: 10)->unwrap()->body, str_repeat('x', 10));
+    }
+
+    public function anEmptyMediaBodyIsAFailure(): void
+    {
+        $client = Http::client(['https://cdn.example.com/empty' => new Response(200, ['Content-Type' => 'image/png'], '')]);
+
+        $failure = $this->fetcher($client)->fetchMedia(url: 'https://cdn.example.com/empty', acceptedTypes: ['image/png'], maxBytes: 10)->error();
+
+        Assert::same($failure?->reason, FetchFailureReason::EmptyBody);
+        Assert::false((bool) $failure?->isTransient());
+        Assert::same(PreviewFailureReason::fromFetch(FetchFailureReason::EmptyBody), PreviewFailureReason::EmptyBody);
+    }
+
+    public function aPinningClientsOwnBodyLimitIsTooLargeNotARefusal(): void
+    {
+        $client = new class implements \Psr\Http\Client\ClientInterface {
+            public function sendRequest(\Psr\Http\Message\RequestInterface $request): \Psr\Http\Message\ResponseInterface
+            {
+                throw new \Rasuvaeff\PinnedHttpClient\ResponseTooLarge($request, 10);
+            }
+        };
+
+        Assert::same($this->fetcher($client)->fetchMedia(url: 'https://cdn.example.com/big', acceptedTypes: ['image/png'], maxBytes: 100)->error()?->reason, FetchFailureReason::TooLarge);
+        Assert::same($this->fetcher($client)->fetch(url: 'https://example.com/')->error()?->reason, FetchFailureReason::TooLarge);
     }
 
     public function mediaObeysThePolicyOnEveryHop(): void

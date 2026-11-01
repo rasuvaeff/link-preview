@@ -11,6 +11,7 @@ use Psr\Http\Client\NetworkExceptionInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 use Rasuvaeff\LinkPreview\Url\UrlResolver;
+use Rasuvaeff\PinnedHttpClient\ResponseTooLarge;
 use Rasuvaeff\Result\Result;
 
 /**
@@ -167,6 +168,7 @@ final readonly class Fetcher
             },
             headers: [],
             maxBytes: $maxBytes,
+            rejectEmpty: true,
         );
     }
 
@@ -176,7 +178,7 @@ final readonly class Fetcher
      *
      * @return Result<FetchedPage, FetchFailure>
      */
-    private function get(string $url, string $accept, \Closure $accepts, array $headers, int $maxBytes): Result
+    private function get(string $url, string $accept, \Closure $accepts, array $headers, int $maxBytes, bool $rejectEmpty = false): Result
     {
         $startedAt = (int) hrtime(as_number: true);
         $redirects = 0;
@@ -207,7 +209,7 @@ final readonly class Fetcher
             $status = $response->getStatusCode();
 
             if (!\in_array($status, self::REDIRECTS, strict: true)) {
-                return $this->page($url, $response, $redirects, $accepts, $maxBytes);
+                return $this->page($url, $response, $redirects, $accepts, $maxBytes, $rejectEmpty);
             }
 
             if ($redirects >= $this->maxRedirects) {
@@ -260,8 +262,10 @@ final readonly class Fetcher
             return $this->client->sendRequest($request);
         } catch (NetworkExceptionInterface) {
             return FetchFailureReason::Network;
-        } catch (ClientExceptionInterface) {
-            return FetchFailureReason::ClientRefused;
+        } catch (ClientExceptionInterface $refused) {
+            // a pinning client's own body limit is a size failure, not a refusal; rasuvaeff/pinned-http-client is
+            // optional, and instanceof of an absent class is simply false
+            return $refused instanceof ResponseTooLarge ? FetchFailureReason::TooLarge : FetchFailureReason::ClientRefused;
         }
     }
 
@@ -272,7 +276,7 @@ final readonly class Fetcher
      *
      * @return Result<FetchedPage, FetchFailure>
      */
-    private function page(string $url, ResponseInterface $response, int $redirects, \Closure $accepts, int $maxBytes): Result
+    private function page(string $url, ResponseInterface $response, int $redirects, \Closure $accepts, int $maxBytes, bool $rejectEmpty): Result
     {
         $status = $response->getStatusCode();
 
@@ -301,6 +305,10 @@ final readonly class Fetcher
 
         if ($body === null) {
             return $this->failure(FetchFailureReason::TooLarge);
+        }
+
+        if ($rejectEmpty && $body === '') {
+            return $this->failure(FetchFailureReason::EmptyBody);
         }
 
         $charset = preg_match('/;\s*charset\s*=\s*"?([A-Za-z0-9._:-]+)/i', $contentType, $matches) === 1
