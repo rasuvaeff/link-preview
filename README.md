@@ -105,13 +105,14 @@ A failed preview is a `PreviewFailure`: `reason` (`PreviewFailureReason`), `stat
 | `reason` | When | `isTransient()` |
 |---|---|---|
 | `PolicyRejected` | the URL, a redirect target or the `pageUrl` of `fromHtml()` is refused by `UrlPolicy` | no |
-| `Network` | the client threw a `NetworkExceptionInterface` (connect, DNS, timeout) | **yes** |
-| `ClientRefused` | the client threw any other `ClientExceptionInterface` (a pinning client found a forbidden or no address, its own body limit) | no |
+| `Network` | the client threw a `NetworkExceptionInterface` (connect, DNS — pinned-http-client's `ResolutionFailed` included —, timeout) | **yes** |
+| `ClientRefused` | the client threw any other `ClientExceptionInterface` (a pinning client found a forbidden address) | no |
 | `TooManyRedirects`, `InvalidRedirect` | the redirect chain is too long, or a `Location` is unusable | no |
 | `BudgetExceeded` | `chainBudgetSeconds` ran out between hops | **yes** |
 | `HttpStatus` | a status that is neither 2xx nor a followable redirect; `status` holds it | **yes** for 408, 425, 429 and 5xx, no otherwise |
 | `UnexpectedContentType` | the answer is not HTML (or JSON, or the media types asked for) | no |
-| `TooLarge` | the body is over the size limit | no |
+| `TooLarge` | the body is over the size limit (the Fetcher's, `fetchMedia()`'s or a pinning client's own) | no |
+| `EmptyBody` | `fetchMedia()` only: a 2xx answer with an empty body | no |
 | `MissingToken` | the site's adapter needs a token that was not configured, and the page itself was unavailable | no |
 | `EmptyPage` | the page was fetched but no source found anything in it | no |
 
@@ -201,7 +202,7 @@ $json = $fetcher->fetchJson(url: 'https://api.example.com/x');  // application/j
 $media = $fetcher->fetchMedia(url: $info->image, acceptedTypes: ['image/*'], maxBytes: 5_242_880);
 ```
 
-Redirects are followed by `Fetcher`, not by the client, and `UrlPolicy` judges every target **before** any request is made to it. A failure is a `FetchFailure` (`reason`, `status`, `retryAfterSeconds`, `isTransient()`; reasons as in *Failures*, without the preview-only `MissingToken` and `EmptyPage`). `fetch()` accepts only `text/html` and `application/xhtml+xml`. `fetchMedia()` replaces the Fetcher's `maxBodyBytes` with its own `maxBytes`, but the client's own limit still applies: a body over `PinnedClient`'s `maxBodyBytes` is `ClientRefused`. Give media a `Fetcher` of its own over `$pinned->withMaxBodyBytes($mediaMaxBytes + 1)`. It takes media types (`image/png`) or families (`image/*`), lower-case, and throws `InvalidArgumentException` for an empty or malformed list or a limit below 1 - those are programming errors, not input. `UserAgentMap` matches a host and its subdomains.
+Redirects are followed by `Fetcher`, not by the client, and `UrlPolicy` judges every target **before** any request is made to it. A failure is a `FetchFailure` (`reason`, `status`, `retryAfterSeconds`, `isTransient()`; reasons as in *Failures*, without the preview-only `MissingToken` and `EmptyPage`). `fetch()` accepts only `text/html` and `application/xhtml+xml`. `fetchMedia()` replaces the Fetcher's `maxBodyBytes` with its own `maxBytes`, and the client's own limit still applies: a body over `PinnedClient`'s `maxBodyBytes` is `TooLarge` as well. Give media a `Fetcher` over `$pinned->withMaxBodyBytes($mediaMaxBytes)` when media may be larger than pages. An empty 2xx body is `EmptyBody`. It takes media types (`image/png`) or families (`image/*`), lower-case, and throws `InvalidArgumentException` for an empty or malformed list or a limit below 1 - those are programming errors, not input. `UserAgentMap` matches a host and its subdomains.
 
 ### Limits
 

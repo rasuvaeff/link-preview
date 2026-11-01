@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.0 — 2026-11-01
+
+Findings of the cska-one consumer pilot:
+
+- `siteName` falls back to `providerName` before the host (`hostAsSiteName`):
+  a card known only by its oEmbed provider is no longer signed by its domain.
+- A pinning client's own body limit (`rasuvaeff/pinned-http-client`
+  `ResponseTooLarge`) is `TooLarge`, not `ClientRefused` — the two limits no
+  longer need the "+1 byte" dance to tell a big body from a refusal.
+- `fetchMedia()`: a 2xx answer with an empty body is the new
+  `FetchFailureReason::EmptyBody` / `PreviewFailureReason::EmptyBody`
+  (permanent) instead of an empty success.
+- An unresolvable host from pinned-http-client 0.3 (`ResolutionFailed`, a
+  `NetworkExceptionInterface`) is `Network` — transient; dev/suggest bumped
+  to `^0.3`.
+- Requires `rasuvaeff/schema` ^0.6 (internal answer schemas; diagnostics now
+  quote non-plain keys in paths).
+
 ## 0.2.0 — 2026-11-01
 
 - Requires `rasuvaeff/json-ld` ^0.2 (`ProcessingOptions`; loader failures arrive as

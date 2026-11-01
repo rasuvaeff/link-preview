@@ -195,6 +195,7 @@ final class PreviewProviderTest
         yield 'too large' => [PreviewFailureReason::TooLarge, null, false];
         yield 'missing token' => [PreviewFailureReason::MissingToken, null, false];
         yield 'empty page' => [PreviewFailureReason::EmptyPage, null, false];
+        yield 'empty body' => [PreviewFailureReason::EmptyBody, null, false];
         yield 'status unknown' => [PreviewFailureReason::HttpStatus, null, false];
         yield '304' => [PreviewFailureReason::HttpStatus, 304, false];
         yield '400' => [PreviewFailureReason::HttpStatus, 400, false];
@@ -376,6 +377,19 @@ final class PreviewProviderTest
         Assert::same($withHost->fromHtml(html: '<title>T</title>', pageUrl: 'https://wwwexample.com/')->unwrap()->siteName, 'wwwexample.com');
         Assert::same($withHost->fromHtml(html: '<meta property="og:site_name" content="Own">', pageUrl: 'https://www.example.com/')->unwrap()->siteName, 'Own');
         Assert::same($withHost->fromHtml(html: '<p>nothing</p>', pageUrl: 'https://www.example.com/')->error()?->reason, PreviewFailureReason::EmptyPage);
+    }
+
+    public function theProviderNamesTheSiteBeforeTheHost(): void
+    {
+        $client = Http::client([
+            'https://www.example.com/p' => Http::html('<head><link rel="alternate" type="application/json+oembed" href="/oembed"></head>'),
+            'https://www.example.com/oembed' => Adapters::json('{"type":"rich","title":"T","provider_name":"Example Media"}'),
+        ]);
+        $fetcher = $this->fetcher($client);
+
+        $info = (new PreviewProvider(fetcher: $fetcher, hostAsSiteName: true))->preview(url: 'https://www.example.com/p')->unwrap();
+
+        Assert::same([$info->siteName, $info->providerName], ['Example Media', 'Example Media']);
     }
 
     public function itIsALinkPreviewer(): void

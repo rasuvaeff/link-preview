@@ -83,13 +83,14 @@ $failure->isTransient();     // retry later?
 | reason | transient |
 |---|---|
 | PolicyRejected | no |
-| Network (client threw NetworkExceptionInterface) | yes |
-| ClientRefused (any other ClientExceptionInterface, e.g. pinning refusal) | no |
+| Network (client threw NetworkExceptionInterface; pinned ResolutionFailed = DNS) | yes |
+| ClientRefused (any other ClientExceptionInterface, e.g. pinning refusal of an address) | no |
 | TooManyRedirects, InvalidRedirect | no |
 | BudgetExceeded | yes |
 | HttpStatus | yes for 408, 425, 429, 5xx; else no |
 | UnexpectedContentType | no |
-| TooLarge | no |
+| TooLarge (Fetcher limit, fetchMedia maxBytes, or a pinning client's ResponseTooLarge) | no |
+| EmptyBody (fetchMedia only: empty 2xx body) | no |
 | MissingToken | no |
 | EmptyPage | no |
 
@@ -139,8 +140,9 @@ $fetcher->check(url: $url);                                    // Result<string,
 
 2xx only, body <= limit (Content-Length checked first). Redirects 301/302/303/307/308, `Location` resolved against the current URL,
 policy checked before each request. fetchMedia types: lower-case `type/subtype` or `type/*`.
-The client's own body limit still applies to fetchMedia (PinnedClient maxBodyBytes < maxBytes -> ClientRefused):
-use a separate media Fetcher over `$pinned->withMaxBodyBytes($mediaMax + 1)`.
+The client's own body limit still applies to fetchMedia (PinnedClient maxBodyBytes < maxBytes -> TooLarge):
+use a separate media Fetcher over `$pinned->withMaxBodyBytes($mediaMax)` when media may be larger than pages.
+An empty 2xx body is EmptyBody.
 
 ### Extractors and documents
 

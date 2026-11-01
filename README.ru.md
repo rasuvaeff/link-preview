@@ -105,13 +105,14 @@ if ($result->isOk()) {
 | `reason` | Когда | `isTransient()` |
 |---|---|---|
 | `PolicyRejected` | URL, цель редиректа или `pageUrl` у `fromHtml()` отвергнуты `UrlPolicy` | нет |
-| `Network` | клиент бросил `NetworkExceptionInterface` (соединение, DNS, таймаут) | **да** |
-| `ClientRefused` | клиент бросил любой другой `ClientExceptionInterface` (пиннинг-клиент нашёл запрещённый адрес или ни одного, его собственный лимит тела) | нет |
+| `Network` | клиент бросил `NetworkExceptionInterface` (соединение, DNS — включая `ResolutionFailed` у pinned-http-client —, таймаут) | **да** |
+| `ClientRefused` | клиент бросил любой другой `ClientExceptionInterface` (пиннинг-клиент нашёл запрещённый адрес) | нет |
 | `TooManyRedirects`, `InvalidRedirect` | цепочка редиректов слишком длинная или `Location` непригоден | нет |
 | `BudgetExceeded` | `chainBudgetSeconds` исчерпан между хопами | **да** |
 | `HttpStatus` | статус не 2xx и не редирект, которому можно следовать; он лежит в `status` | **да** для 408, 425, 429 и 5xx, иначе нет |
 | `UnexpectedContentType` | ответ не HTML (или не JSON, или не запрошенные типы медиа) | нет |
-| `TooLarge` | тело больше лимита | нет |
+| `TooLarge` | тело больше лимита (Fetcher, `fetchMedia()` или собственного лимита пиннинг-клиента) | нет |
+| `EmptyBody` | только `fetchMedia()`: ответ 2xx с пустым телом | нет |
 | `MissingToken` | адаптеру сайта нужен токен, который не задан, и сама страница недоступна | нет |
 | `EmptyPage` | страница загружена, но ни один источник ничего в ней не нашёл | нет |
 
@@ -201,7 +202,7 @@ $json = $fetcher->fetchJson(url: 'https://api.example.com/x');  // application/j
 $media = $fetcher->fetchMedia(url: $info->image, acceptedTypes: ['image/*'], maxBytes: 5_242_880);
 ```
 
-Редиректам следует `Fetcher`, а не клиент, и `UrlPolicy` судит каждую цель **до** любого запроса к ней. Отказ - это `FetchFailure` (`reason`, `status`, `retryAfterSeconds`, `isTransient()`; причины как в «Отказах», без `MissingToken` и `EmptyPage`, которые есть только у превью). `fetch()` принимает только `text/html` и `application/xhtml+xml`. `fetchMedia()` заменяет `maxBodyBytes` у Fetcher своим `maxBytes`, но собственный лимит клиента продолжает действовать: тело больше `maxBodyBytes` у `PinnedClient` - это `ClientRefused`. Заведите для медиа отдельный `Fetcher` поверх `$pinned->withMaxBodyBytes($mediaMaxBytes + 1)`. Он принимает типы медиа (`image/png`) или семейства (`image/*`) в нижнем регистре и бросает `InvalidArgumentException` на пустой или кривой список или лимит меньше 1 - это ошибки программиста, а не ввод. `UserAgentMap` сопоставляет хост и его поддомены.
+Редиректам следует `Fetcher`, а не клиент, и `UrlPolicy` судит каждую цель **до** любого запроса к ней. Отказ - это `FetchFailure` (`reason`, `status`, `retryAfterSeconds`, `isTransient()`; причины как в «Отказах», без `MissingToken` и `EmptyPage`, которые есть только у превью). `fetch()` принимает только `text/html` и `application/xhtml+xml`. `fetchMedia()` заменяет `maxBodyBytes` у Fetcher своим `maxBytes`, и собственный лимит клиента продолжает действовать: тело больше `maxBodyBytes` у `PinnedClient` - это тоже `TooLarge`. Если медиа бывают больше страниц, заведите для них `Fetcher` поверх `$pinned->withMaxBodyBytes($mediaMaxBytes)`. Пустое тело 2xx - это `EmptyBody`. Он принимает типы медиа (`image/png`) или семейства (`image/*`) в нижнем регистре и бросает `InvalidArgumentException` на пустой или кривой список или лимит меньше 1 - это ошибки программиста, а не ввод. `UserAgentMap` сопоставляет хост и его поддомены.
 
 ### Limits
 
