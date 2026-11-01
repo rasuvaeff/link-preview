@@ -6,6 +6,7 @@ namespace Rasuvaeff\LinkPreview\Tests\Extract;
 
 use Rasuvaeff\LinkPreview\Extract\ExtractFailure;
 use Rasuvaeff\LinkPreview\Extract\TwitterCardsExtractor;
+use Rasuvaeff\LinkPreview\Extract\UrlContext;
 use Rasuvaeff\LinkPreview\Html\PageDocument;
 use Rasuvaeff\LinkPreview\Tests\Support\Fixtures;
 use Testo\Assert;
@@ -14,6 +15,7 @@ use Testo\Test;
 
 #[Test]
 #[Covers(TwitterCardsExtractor::class)]
+#[Covers(UrlContext::class)]
 final class TwitterCardsExtractorTest
 {
     private const string PAGE = 'https://example.com/a/b';

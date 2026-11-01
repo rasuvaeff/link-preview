@@ -6,6 +6,8 @@ namespace Rasuvaeff\LinkPreview\Tests\Adapter;
 
 use Rasuvaeff\LinkPreview\Adapter\AdapterFailure;
 use Rasuvaeff\LinkPreview\Adapter\GitHubAdapter;
+use Rasuvaeff\LinkPreview\Adapter\OEmbedSupport;
+use Rasuvaeff\LinkPreview\Adapter\PageMetadata;
 use Rasuvaeff\LinkPreview\Tests\Support\Adapters;
 use Rasuvaeff\LinkPreview\Tests\Support\Http;
 use Testo\Assert;
@@ -14,6 +16,8 @@ use Testo\Test;
 
 #[Test]
 #[Covers(GitHubAdapter::class)]
+#[Covers(OEmbedSupport::class)]
+#[Covers(PageMetadata::class)]
 final class GitHubAdapterTest
 {
     public function readsTheRepositoryPage(): void

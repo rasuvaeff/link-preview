@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Rasuvaeff\LinkPreview\Tests\Adapter;
 
 use Rasuvaeff\LinkPreview\Adapter\AdapterContext;
+use Rasuvaeff\LinkPreview\Fetch\FetchedPage;
 use Rasuvaeff\LinkPreview\Tests\Support\Adapters;
 use Rasuvaeff\LinkPreview\Tests\Support\Http;
 use Testo\Assert;
@@ -13,6 +14,7 @@ use Testo\Test;
 
 #[Test]
 #[Covers(AdapterContext::class)]
+#[Covers(FetchedPage::class)]
 final class AdapterContextTest
 {
     public function aPageIsFetchedOnce(): void

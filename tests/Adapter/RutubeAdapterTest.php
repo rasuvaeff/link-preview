@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Rasuvaeff\LinkPreview\Tests\Adapter;
 
 use Rasuvaeff\LinkPreview\Adapter\AdapterFailure;
+use Rasuvaeff\LinkPreview\Adapter\OEmbedSupport;
 use Rasuvaeff\LinkPreview\Adapter\RutubeAdapter;
+use Rasuvaeff\LinkPreview\Extract\Json;
 use Rasuvaeff\LinkPreview\Tests\Support\Adapters;
 use Rasuvaeff\LinkPreview\Tests\Support\Http;
 use Testo\Assert;
@@ -15,6 +17,8 @@ use Testo\Test;
 
 #[Test]
 #[Covers(RutubeAdapter::class)]
+#[Covers(OEmbedSupport::class)]
+#[Covers(Json::class)]
 final class RutubeAdapterTest
 {
     private const string ID = '5ac7c1f0a1b2c3d4e5f60718293a4b5c';
@@ -69,5 +73,21 @@ final class RutubeAdapterTest
     public function servesItsDomains(): void
     {
         Assert::same((new RutubeAdapter())->domains(), ['rutube.ru']);
+    }
+
+    #[DataProvider('publishedProvider')]
+    public function publicationTimeComesFromCreatedFirst(string $fields, string $expected): void
+    {
+        $client = Http::client(['https://rutube.ru/api/video/' . self::ID . '/?format=json' => Adapters::json('{"title":"t",' . $fields . '}')]);
+
+        $metadata = (new RutubeAdapter())->preview('https://rutube.ru/video/' . self::ID . '/', Adapters::context($client))->unwrap();
+
+        Assert::same($metadata->publishedTime?->format('c'), $expected);
+    }
+
+    public static function publishedProvider(): iterable
+    {
+        yield 'both' => ['"created":"2026-09-30T10:15:00","publication_ts":"2026-10-01T00:00:00"', '2026-09-30T10:15:00+00:00'];
+        yield 'only publication_ts' => ['"publication_ts":"2026-10-01T00:00:00"', '2026-10-01T00:00:00+00:00'];
     }
 }

@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Rasuvaeff\LinkPreview\Tests\Extract;
 
 use Rasuvaeff\LinkPreview\Adapter\AdapterFailure;
+use Rasuvaeff\LinkPreview\Adapter\OEmbedSupport;
 use Rasuvaeff\LinkPreview\Adapter\RutubeAdapter;
 use Rasuvaeff\LinkPreview\Adapter\WikipediaAdapter;
 use Rasuvaeff\LinkPreview\Adapter\YouTubeAdapter;
+use Rasuvaeff\LinkPreview\Extract\Json;
 use Rasuvaeff\LinkPreview\Extract\OEmbedResponse;
 use Rasuvaeff\LinkPreview\Extract\Schemas;
 use Rasuvaeff\LinkPreview\Limits;
@@ -25,6 +27,11 @@ use Testo\Test;
 #[Test]
 #[Covers(Schemas::class)]
 #[Covers(OEmbedResponse::class)]
+#[Covers(Json::class)]
+#[Covers(OEmbedSupport::class)]
+#[Covers(RutubeAdapter::class)]
+#[Covers(WikipediaAdapter::class)]
+#[Covers(YouTubeAdapter::class)]
 final class SchemasTest
 {
     public function anOpenAnswerWithNullsAndExtrasIsReadable(): void
@@ -68,6 +75,8 @@ final class SchemasTest
 
         Assert::same(substr_count($error, '; ') + 1, 5);
         Assert::string($error)->contains('$.type');
+        Assert::string($error)->contains('$.type: Expected string, got int; $.title: Expected string, got int; ');
+        Assert::false(str_contains($error, '$.html'));
     }
 
     public function anAnswerWithNothingToShowIsDiagnosed(): void
@@ -82,9 +91,7 @@ final class SchemasTest
         $result = (new YouTubeAdapter())->preview('https://youtu.be/abcdefghijk', $context);
 
         Assert::same($result->error(), AdapterFailure::InvalidResponse);
-        Assert::same(\count($context->diagnostics()), 1);
-        Assert::string($context->diagnostics()[0])->contains('$.title');
-        Assert::false(str_contains($context->diagnostics()[0], 'secret-value'));
+        Assert::same($context->diagnostics(), ['oEmbed $.title: Expected string, got array']);
     }
 
     public function wikipediaAndRutubeRecordTheirOwn(): void
@@ -95,8 +102,36 @@ final class SchemasTest
         $rutube = Adapters::context(Http::sequence(Adapters::json('{"title":5}')));
         (new RutubeAdapter())->preview('https://rutube.ru/video/5ac7c1f0a1b2c3d4e5f60718293a4b5c/', $rutube);
 
-        Assert::string($wikipedia->diagnostics()[0])->contains('Wikipedia summary $.title');
-        Assert::string($rutube->diagnostics()[0])->contains('Rutube video $.title');
+        Assert::same($wikipedia->diagnostics(), ['Wikipedia summary $.title: String length must be at least 1, got 0']);
+        Assert::same($rutube->diagnostics(), ['Rutube video $.title: Expected string, got int']);
+    }
+
+    public function titlesAreRequiredToBeNonEmptyButOneCharacterIsEnough(): void
+    {
+        $rutube = Adapters::context(Http::sequence(Adapters::json('{"title":""}')));
+        (new RutubeAdapter())->preview('https://rutube.ru/video/5ac7c1f0a1b2c3d4e5f60718293a4b5c/', $rutube);
+
+        Assert::same($rutube->diagnostics(), ['Rutube video $.title: String length must be at least 1, got 0']);
+
+        Assert::true(Schemas::parse(Schemas::wikipediaSummary(), '{"title":"A"}')->isOk());
+        Assert::true(Schemas::parse(Schemas::rutubeVideo(), '{"title":"A"}')->isOk());
+        Assert::true(Schemas::parse(Schemas::rutubeVideo(), '{"title":""}')->isErr());
+    }
+
+    #[DataProvider('nestedProvider')]
+    public function nestedFieldsOfServicesAreChecked(string $schema, string $json, string $path): void
+    {
+        $parsed = Schemas::parse($schema === 'wikipedia' ? Schemas::wikipediaSummary() : Schemas::rutubeVideo(), $json);
+
+        Assert::string((string) $parsed->error())->contains($path);
+    }
+
+    public static function nestedProvider(): iterable
+    {
+        yield 'wikipedia thumbnail' => ['wikipedia', '{"title":"x","thumbnail":{"source":5}}', '$.thumbnail.source'];
+        yield 'wikipedia page' => ['wikipedia', '{"title":"x","content_urls":{"desktop":{"page":5}}}', '$.content_urls.desktop.page'];
+        yield 'wikipedia desktop' => ['wikipedia', '{"title":"x","content_urls":{"desktop":5}}', '$.content_urls.desktop'];
+        yield 'rutube author' => ['rutube', '{"title":"x","author":{"name":5}}', '$.author.name'];
     }
 
     /**

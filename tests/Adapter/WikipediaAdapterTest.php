@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Rasuvaeff\LinkPreview\Tests\Adapter;
 
 use Rasuvaeff\LinkPreview\Adapter\AdapterFailure;
+use Rasuvaeff\LinkPreview\Adapter\OEmbedSupport;
 use Rasuvaeff\LinkPreview\Adapter\WikipediaAdapter;
+use Rasuvaeff\LinkPreview\Extract\Json;
 use Rasuvaeff\LinkPreview\Tests\Support\Adapters;
 use Rasuvaeff\LinkPreview\Tests\Support\Http;
 use Testo\Assert;
@@ -15,6 +17,8 @@ use Testo\Test;
 
 #[Test]
 #[Covers(WikipediaAdapter::class)]
+#[Covers(OEmbedSupport::class)]
+#[Covers(Json::class)]
 final class WikipediaAdapterTest
 {
     public function readsTheRestSummary(): void

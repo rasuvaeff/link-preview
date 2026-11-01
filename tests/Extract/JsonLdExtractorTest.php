@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Rasuvaeff\LinkPreview\Tests\Extract;
 
 use Rasuvaeff\LinkPreview\Extract\ExtractFailure;
+use Rasuvaeff\LinkPreview\Extract\Json;
 use Rasuvaeff\LinkPreview\Extract\JsonLdExtractor;
 use Rasuvaeff\LinkPreview\Extract\JsonLdFailure;
 use Rasuvaeff\LinkPreview\Extract\JsonLdReader;
 use Rasuvaeff\LinkPreview\Extract\Metadata;
+use Rasuvaeff\LinkPreview\Extract\UrlContext;
 use Rasuvaeff\LinkPreview\Html\PageDocument;
 use Rasuvaeff\LinkPreview\Tests\Support\Fixtures;
 use Rasuvaeff\Result\Result;
@@ -19,6 +21,8 @@ use Testo\Test;
 
 #[Test]
 #[Covers(JsonLdExtractor::class)]
+#[Covers(Json::class)]
+#[Covers(UrlContext::class)]
 final class JsonLdExtractorTest
 {
     private const string PAGE = 'https://example.com/news/a.html';
@@ -322,5 +326,100 @@ final class JsonLdExtractorTest
     private function extract(string $html): Result
     {
         return (new JsonLdExtractor())->extract(document: PageDocument::parse($html), pageUrl: self::PAGE);
+    }
+
+    public function nodesAreMergedByRankWhateverTheirOrderInTheDocument(): void
+    {
+        $json = '{"@context":"https://schema.org","@graph":['
+            . '{"@type":"WebSite","name":"Site"},'
+            . '{"@type":"WebPage","name":"Page","description":"Page description","url":"/page"},'
+            . '{"@type":"VideoObject","name":"Video","description":"Video description"},'
+            . '{"@type":"Article","headline":"Article headline"}'
+            . ']}';
+
+        $metadata = $this->extract($this->block($json))->unwrap();
+
+        Assert::same($metadata->title, 'Article headline');
+        Assert::same($metadata->description, 'Video description');
+        Assert::same($metadata->url, 'https://example.com/page');
+        Assert::same($metadata->siteName, 'Site');
+    }
+
+    public function theBestTypeOfANodeSetsItsRankWhereverItStands(): void
+    {
+        $first = '{"@type":["WebPage","Article"],"name":"Mixed"}';
+        $second = '{"@type":["Article","WebPage"],"name":"Mixed"}';
+        $video = '{"@type":"VideoObject","name":"Video"}';
+
+        Assert::same($this->extract($this->block('{"@context":"https://schema.org","@graph":[' . $video . ',' . $first . ']}'))->unwrap()->title, 'Mixed');
+        Assert::same($this->extract($this->block('{"@context":"https://schema.org","@graph":[' . $video . ',' . $second . ']}'))->unwrap()->title, 'Mixed');
+    }
+
+    public function nodesOfOneRankKeepTheirDocumentOrder(): void
+    {
+        $json = '{"@context":"https://schema.org","@graph":[{"@type":"Article","headline":"One"},{"@type":"Article","headline":"Two","description":"Second"}]}';
+
+        $metadata = $this->extract($this->block($json))->unwrap();
+
+        Assert::same($metadata->title, 'One');
+        Assert::same($metadata->description, 'Second');
+    }
+
+    public function theFirstNameableTypeIsTheReportedOne(): void
+    {
+        $metadata = $this->extract($this->block('{"@context":"https://schema.org","@type":["Thing","VideoObject"],"name":"N"}'))->unwrap();
+
+        Assert::same($metadata->type, 'Thing');
+    }
+
+    public function headlineBeatsNameAndDatePublishedBeatsUploadDate(): void
+    {
+        $metadata = $this->extract($this->block('{"@context":"https://schema.org","@type":"Article","headline":"Headline","name":"Name","datePublished":"2026-01-02","uploadDate":"2026-03-04"}'))->unwrap();
+
+        Assert::same($metadata->title, 'Headline');
+        Assert::same($metadata->publishedTime?->format('Y-m-d'), '2026-01-02');
+    }
+
+    public function linksGivenAsObjectsAreReadByTheirUrl(): void
+    {
+        $metadata = $this->extract($this->block('{"@context":"https://schema.org","@type":"VideoObject","name":"V","url":{"url":"/video"},"embedUrl":{"url":"/embed"}}'))->unwrap();
+
+        Assert::same($metadata->url, 'https://example.com/video');
+        Assert::same($metadata->embedUrl, 'https://example.com/embed');
+    }
+
+    public function anIdOfAnUnknownNodeIsTheLinkItself(): void
+    {
+        $metadata = $this->extract($this->block('{"@context":"https://schema.org","@type":"Article","headline":"H","url":{"@id":"https://example.com/by-id"}}'))->unwrap();
+
+        Assert::same($metadata->url, 'https://example.com/by-id');
+    }
+
+    public function aReferenceKeepsItsOwnPropertiesWhenItHasAny(): void
+    {
+        $json = '{"@context":"https://schema.org","@graph":[{"@type":"Article","headline":"H","image":{"@id":"#img","url":"/own.png"}},{"@type":"ImageObject","@id":"#img","url":"/other.png"}]}';
+
+        Assert::same($this->extract($this->block($json))->unwrap()->image, 'https://example.com/own.png');
+    }
+
+    public function anUnusableImageDoesNotStopTheSearch(): void
+    {
+        $metadata = $this->extract($this->block('{"@context":"https://schema.org","@type":"Article","headline":"H","image":["javascript:alert(1)","/ok.png"]}'))->unwrap();
+
+        Assert::same($metadata->image, 'https://example.com/ok.png');
+    }
+
+    public function onlyTheFirstPropertyOfAnObjectIsUsed(): void
+    {
+        $metadata = $this->extract($this->block('{"@context":"https://schema.org","@type":"Article","headline":"H","url":{"url":"javascript:alert(1)","@id":"https://example.com/b"}}'))->unwrap();
+
+        Assert::null($metadata->url);
+    }
+
+    public function laterLinksAreTriedWhenTheEarlierOnesAreUnusable(): void
+    {
+        $metadata = $this->extract($this->block('{"@context":"https://schema.org","@type":"VideoObject","name":"V","embedUrl":["javascript:alert(1)","https://example.com/e"]}'))->unwrap();
+
+        Assert::same($metadata->embedUrl, 'https://example.com/e');
     }
 }

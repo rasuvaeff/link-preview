@@ -6,6 +6,7 @@ namespace Rasuvaeff\LinkPreview\Tests\Adapter;
 
 use Rasuvaeff\LinkPreview\Adapter\AdapterFailure;
 use Rasuvaeff\LinkPreview\Adapter\InstagramAdapter;
+use Rasuvaeff\LinkPreview\Adapter\OEmbedSupport;
 use Rasuvaeff\LinkPreview\Tests\Support\Adapters;
 use Rasuvaeff\LinkPreview\Tests\Support\Http;
 use Testo\Assert;
@@ -15,6 +16,7 @@ use Testo\Test;
 
 #[Test]
 #[Covers(InstagramAdapter::class)]
+#[Covers(OEmbedSupport::class)]
 final class InstagramAdapterTest
 {
     private const string URL = 'https://www.instagram.com/p/CxYz123AbC/';

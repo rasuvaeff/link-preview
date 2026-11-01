@@ -4,16 +4,20 @@ declare(strict_types=1);
 
 namespace Rasuvaeff\LinkPreview\Tests\Extract;
 
+use Rasuvaeff\LinkPreview\Extract\Json;
 use Rasuvaeff\LinkPreview\Extract\JsonLdFailure;
 use Rasuvaeff\LinkPreview\Extract\ProcessorJsonLdReader;
 use Rasuvaeff\LinkPreview\Extract\SchemaOrgContextLoader;
+use RuntimeException;
 use Testo\Assert;
 use Testo\Codecov\Covers;
+use Testo\Expect;
 use Testo\Test;
 
 #[Test]
 #[Covers(ProcessorJsonLdReader::class)]
 #[Covers(SchemaOrgContextLoader::class)]
+#[Covers(Json::class)]
 final class ProcessorJsonLdReaderTest
 {
     public function flattensTheGraphAndKeepsTheRoot(): void
@@ -101,5 +105,19 @@ final class ProcessorJsonLdReaderTest
         $nodes = (new ProcessorJsonLdReader())->nodes('{"@context":["https://schema.org",{"ex":"https://example.org/ns#"}],"@type":"Article","headline":"H","ex:secret":"x"}')->unwrap();
 
         Assert::same($nodes, [['@type' => 'Article', 'headline' => 'H']]);
+    }
+
+    public function theSchemaOrgContextIsRecognisedWhateverItsCase(): void
+    {
+        $loader = new SchemaOrgContextLoader();
+
+        Assert::same($loader->load('HTTPS://WWW.SCHEMA.ORG/')->documentUrl, 'HTTPS://WWW.SCHEMA.ORG/');
+    }
+
+    public function anyOtherContextIsRefused(): void
+    {
+        Expect::exception(RuntimeException::class);
+
+        (new SchemaOrgContextLoader())->load('https://evil.example/context.json');
     }
 }
