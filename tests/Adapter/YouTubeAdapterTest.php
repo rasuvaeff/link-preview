@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Rasuvaeff\LinkPreview\Tests\Adapter;
 
 use Rasuvaeff\LinkPreview\Adapter\AdapterFailure;
+use Rasuvaeff\LinkPreview\Adapter\OEmbedSupport;
 use Rasuvaeff\LinkPreview\Adapter\YouTubeAdapter;
 use Rasuvaeff\LinkPreview\Tests\Support\Adapters;
 use Rasuvaeff\LinkPreview\Tests\Support\Http;
@@ -15,6 +16,7 @@ use Testo\Test;
 
 #[Test]
 #[Covers(YouTubeAdapter::class)]
+#[Covers(OEmbedSupport::class)]
 final class YouTubeAdapterTest
 {
     private const string ENDPOINT = 'https://www.youtube.com/oembed?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DdQw4w9WgXcQ&format=json';

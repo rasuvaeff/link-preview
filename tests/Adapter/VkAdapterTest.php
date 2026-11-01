@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Rasuvaeff\LinkPreview\Tests\Adapter;
 
 use Rasuvaeff\LinkPreview\Adapter\AdapterFailure;
+use Rasuvaeff\LinkPreview\Adapter\OEmbedSupport;
+use Rasuvaeff\LinkPreview\Adapter\PageMetadata;
 use Rasuvaeff\LinkPreview\Adapter\VkAdapter;
 use Rasuvaeff\LinkPreview\Tests\Support\Adapters;
 use Rasuvaeff\LinkPreview\Tests\Support\Http;
@@ -15,6 +17,8 @@ use Testo\Test;
 
 #[Test]
 #[Covers(VkAdapter::class)]
+#[Covers(OEmbedSupport::class)]
+#[Covers(PageMetadata::class)]
 final class VkAdapterTest
 {
     #[DataProvider('embedProvider')]
@@ -36,6 +40,7 @@ final class VkAdapterTest
         yield 'video in a modal link' => ['https://vk.com/wall-1_2?z=video-22822305_456239018%2Fabc', 'https://vk.com/video_ext.php?oid=-22822305&id=456239018'];
         yield 'plain wall post' => ['https://vk.com/wall-1_2', null];
         yield 'community' => ['https://vk.com/durov', null];
+        yield 'path and modal link are not glued together' => ['https://vk.com/video12?z=_34', null];
     }
 
     public function unreachablePageIsUnavailable(): void

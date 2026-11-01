@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Rasuvaeff\LinkPreview\Tests\Adapter;
 
 use Rasuvaeff\LinkPreview\Adapter\AdapterFailure;
+use Rasuvaeff\LinkPreview\Adapter\OEmbedSupport;
 use Rasuvaeff\LinkPreview\Adapter\TwitterAdapter;
+use Rasuvaeff\LinkPreview\Extract\Json;
 use Rasuvaeff\LinkPreview\Tests\Support\Adapters;
 use Rasuvaeff\LinkPreview\Tests\Support\Http;
 use Testo\Assert;
@@ -15,6 +17,8 @@ use Testo\Test;
 
 #[Test]
 #[Covers(TwitterAdapter::class)]
+#[Covers(OEmbedSupport::class)]
+#[Covers(Json::class)]
 final class TwitterAdapterTest
 {
     private const string ENDPOINT = 'https://publish.twitter.com/oembed?url=https%3A%2F%2Ftwitter.com%2Fjack%2Fstatus%2F20&omit_script=1&dnt=true';
@@ -116,5 +120,32 @@ final class TwitterAdapterTest
     public function servesItsDomains(): void
     {
         Assert::same((new TwitterAdapter())->domains(), ['twitter.com', 'x.com']);
+    }
+
+    public function theReasonForGivingUpIsRecorded(): void
+    {
+        $context = Adapters::context(Http::sequence(Adapters::json('{}')));
+
+        (new TwitterAdapter())->preview('https://twitter.com/a/status/1', $context);
+
+        Assert::same($context->diagnostics(), ['oEmbed $: nothing to show']);
+    }
+
+    public function theTextIsTrimmedAfterDecoding(): void
+    {
+        $client = Http::sequence(Adapters::json((string) json_encode(['type' => 'rich', 'author_name' => 'a', 'html' => '<p>&#32;&nbsp;padded&#32;</p>'])));
+
+        $metadata = (new TwitterAdapter())->preview('https://twitter.com/a/status/1', Adapters::context($client))->unwrap();
+
+        Assert::same($metadata->description, 'padded');
+    }
+
+    public function markupIsReadWhateverItsCase(): void
+    {
+        $client = Http::sequence(Adapters::json((string) json_encode(['type' => 'rich', 'author_name' => 'a', 'html' => '<BLOCKQUOTE><P>Shout<BR>out</P></BLOCKQUOTE>'])));
+
+        $metadata = (new TwitterAdapter())->preview('https://twitter.com/a/status/1', Adapters::context($client))->unwrap();
+
+        Assert::same($metadata->description, 'Shout out');
     }
 }

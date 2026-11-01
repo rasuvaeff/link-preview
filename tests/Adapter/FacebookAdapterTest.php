@@ -6,6 +6,7 @@ namespace Rasuvaeff\LinkPreview\Tests\Adapter;
 
 use Rasuvaeff\LinkPreview\Adapter\AdapterFailure;
 use Rasuvaeff\LinkPreview\Adapter\FacebookAdapter;
+use Rasuvaeff\LinkPreview\Adapter\OEmbedSupport;
 use Rasuvaeff\LinkPreview\Tests\Support\Adapters;
 use Rasuvaeff\LinkPreview\Tests\Support\Http;
 use Testo\Assert;
@@ -15,6 +16,7 @@ use Testo\Test;
 
 #[Test]
 #[Covers(FacebookAdapter::class)]
+#[Covers(OEmbedSupport::class)]
 final class FacebookAdapterTest
 {
     #[DataProvider('resourceProvider')]

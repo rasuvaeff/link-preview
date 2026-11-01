@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Rasuvaeff\LinkPreview\Tests\Fetch;
 
 use InvalidArgumentException;
+use Rasuvaeff\LinkPreview\Fetch\BlockedRanges;
 use Rasuvaeff\LinkPreview\Fetch\UrlPolicy;
 use Rasuvaeff\LinkPreview\Fetch\UrlRejection;
 use Rasuvaeff\LinkPreview\Tests\Support\UrlGenerators;
+use Rasuvaeff\LinkPreview\Url\Cidr;
 use Rasuvaeff\PropertyTesting\Classify;
 use Rasuvaeff\PropertyTesting\Property;
 use Testo\Assert;
@@ -18,6 +20,8 @@ use Testo\Test;
 
 #[Test]
 #[Covers(UrlPolicy::class)]
+#[Covers(BlockedRanges::class)]
+#[Covers(Cidr::class)]
 final class UrlPolicyTest
 {
     #[DataProvider('rejectedProvider')]

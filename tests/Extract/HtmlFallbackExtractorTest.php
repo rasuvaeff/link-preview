@@ -6,6 +6,7 @@ namespace Rasuvaeff\LinkPreview\Tests\Extract;
 
 use Rasuvaeff\LinkPreview\Extract\ExtractFailure;
 use Rasuvaeff\LinkPreview\Extract\HtmlFallbackExtractor;
+use Rasuvaeff\LinkPreview\Extract\UrlContext;
 use Rasuvaeff\LinkPreview\Html\PageDocument;
 use Rasuvaeff\LinkPreview\Tests\Support\Fixtures;
 use Testo\Assert;
@@ -14,6 +15,7 @@ use Testo\Test;
 
 #[Test]
 #[Covers(HtmlFallbackExtractor::class)]
+#[Covers(UrlContext::class)]
 final class HtmlFallbackExtractorTest
 {
     private const string PAGE = 'https://example.com/de/plain.html';

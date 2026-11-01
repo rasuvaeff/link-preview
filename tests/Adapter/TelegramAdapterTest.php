@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Rasuvaeff\LinkPreview\Tests\Adapter;
 
 use Rasuvaeff\LinkPreview\Adapter\AdapterFailure;
+use Rasuvaeff\LinkPreview\Adapter\OEmbedSupport;
+use Rasuvaeff\LinkPreview\Adapter\PageMetadata;
 use Rasuvaeff\LinkPreview\Adapter\TelegramAdapter;
 use Rasuvaeff\LinkPreview\Tests\Support\Adapters;
 use Rasuvaeff\LinkPreview\Tests\Support\Http;
@@ -15,6 +17,8 @@ use Testo\Test;
 
 #[Test]
 #[Covers(TelegramAdapter::class)]
+#[Covers(OEmbedSupport::class)]
+#[Covers(PageMetadata::class)]
 final class TelegramAdapterTest
 {
     #[DataProvider('embedProvider')]

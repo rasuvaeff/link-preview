@@ -7,6 +7,7 @@ namespace Rasuvaeff\LinkPreview\Tests\Extract;
 use Rasuvaeff\LinkPreview\Extract\ExtractFailure;
 use Rasuvaeff\LinkPreview\Extract\Metadata;
 use Rasuvaeff\LinkPreview\Extract\OpenGraphExtractor;
+use Rasuvaeff\LinkPreview\Extract\UrlContext;
 use Rasuvaeff\LinkPreview\Html\PageDocument;
 use Rasuvaeff\LinkPreview\Tests\Support\Fixtures;
 use Testo\Assert;
@@ -15,6 +16,7 @@ use Testo\Test;
 
 #[Test]
 #[Covers(OpenGraphExtractor::class)]
+#[Covers(UrlContext::class)]
 final class OpenGraphExtractorTest
 {
     private const string PAGE = 'https://example.com/news/article.html';

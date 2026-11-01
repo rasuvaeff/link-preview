@@ -9,6 +9,7 @@ use GuzzleHttp\Psr7\Response;
 use InvalidArgumentException;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\ResponseInterface;
+use Rasuvaeff\LinkPreview\Fetch\FetchedPage;
 use Rasuvaeff\LinkPreview\Fetch\Fetcher;
 use Rasuvaeff\LinkPreview\Fetch\FetchFailure;
 use Rasuvaeff\LinkPreview\Fetch\FetchFailureReason;
@@ -37,6 +38,7 @@ use function Rasuvaeff\Understudy\when;
 #[Covers(FetchFailure::class)]
 #[Covers(RetryAfter::class)]
 #[Covers(Transience::class)]
+#[Covers(FetchedPage::class)]
 final class FetcherTest
 {
     public function fetchesAPage(): void

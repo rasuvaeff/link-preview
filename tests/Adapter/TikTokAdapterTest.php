@@ -6,6 +6,7 @@ namespace Rasuvaeff\LinkPreview\Tests\Adapter;
 
 use GuzzleHttp\Psr7\Response;
 use Rasuvaeff\LinkPreview\Adapter\AdapterFailure;
+use Rasuvaeff\LinkPreview\Adapter\OEmbedSupport;
 use Rasuvaeff\LinkPreview\Adapter\TikTokAdapter;
 use Rasuvaeff\LinkPreview\Tests\Support\Adapters;
 use Rasuvaeff\LinkPreview\Tests\Support\Http;
@@ -15,6 +16,7 @@ use Testo\Test;
 
 #[Test]
 #[Covers(TikTokAdapter::class)]
+#[Covers(OEmbedSupport::class)]
 final class TikTokAdapterTest
 {
     public function previewsThroughOEmbed(): void

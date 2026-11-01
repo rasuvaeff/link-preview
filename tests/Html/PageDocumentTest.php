@@ -346,4 +346,32 @@ final class PageDocumentTest
 
         Assert::same($warnings, 0);
     }
+
+    public function theAskedTypeIsMatchedCaseInsensitively(): void
+    {
+        $document = PageDocument::parse('<head>
+            <script type="application/ld+json">{"a":1}</script>
+            <link rel="alternate" type=" application/json+oembed " href="/oembed">
+        </head>');
+
+        Assert::same($document->scripts('APPLICATION/LD+JSON'), ['{"a":1}']);
+        Assert::same($document->alternates('Application/JSON+oEmbed'), ['/oembed']);
+    }
+
+    public function aLongDocumentIsKeptInOrder(): void
+    {
+        $html = '<html><head><title>Top</title></head><body>' . str_repeat('<p>filler</p>', 600) . '<img src="/end.png"></body></html>';
+
+        $document = PageDocument::parse($html);
+
+        Assert::same($document->title(), 'Top');
+        Assert::same($document->images(), [['src' => '/end.png', 'width' => null, 'height' => null]]);
+    }
+
+    public function aPaddedTransportCharsetIsStillAnAlias(): void
+    {
+        $html = mb_convert_encoding('<head><title>“quoted”</title></head>', 'Windows-1252', 'UTF-8');
+
+        Assert::same(PageDocument::parse($html, ' ISO-8859-1 ')->title(), '“quoted”');
+    }
 }

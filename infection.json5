@@ -8,6 +8,14 @@
         "summary": "build/infection-summary.log"
     },
     "testFramework": "testo",
+    // Run with --with-uncovered (composer mutation): Testo credits a test only with the
+    // classes named in its #[Covers], so the overall MSI is the honest gate. Survivors
+    // are equivalents: Metadata/PlainText normalise whatever TwitterAdapter decodes and
+    // trims; Cidr masks/remainders and (int) casts of a regex-validated length coerce
+    // identically; PageDocument's libxml flags and finally are unobservable without a
+    // network or a throwing parser; fetch chunk sizes and the budget boundary are not
+    // deterministic. About 75 Not Covered mutants sit on signatures and constructor
+    // defaults, lines the pcov driver never reports as executable. No ignores.
     "minMsi": 90,
     "mutators": {
         "@default": true

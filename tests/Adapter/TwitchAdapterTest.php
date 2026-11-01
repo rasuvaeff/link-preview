@@ -6,6 +6,7 @@ namespace Rasuvaeff\LinkPreview\Tests\Adapter;
 
 use InvalidArgumentException;
 use Rasuvaeff\LinkPreview\Adapter\AdapterFailure;
+use Rasuvaeff\LinkPreview\Adapter\OEmbedSupport;
 use Rasuvaeff\LinkPreview\Adapter\TwitchAdapter;
 use Rasuvaeff\LinkPreview\Tests\Support\Adapters;
 use Rasuvaeff\LinkPreview\Tests\Support\Http;
@@ -17,6 +18,7 @@ use Testo\Test;
 
 #[Test]
 #[Covers(TwitchAdapter::class)]
+#[Covers(OEmbedSupport::class)]
 final class TwitchAdapterTest
 {
     #[DataProvider('embedProvider')]

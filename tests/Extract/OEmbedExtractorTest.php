@@ -6,8 +6,10 @@ namespace Rasuvaeff\LinkPreview\Tests\Extract;
 
 use GuzzleHttp\Psr7\HttpFactory;
 use Rasuvaeff\LinkPreview\Extract\ExtractFailure;
+use Rasuvaeff\LinkPreview\Extract\Json;
 use Rasuvaeff\LinkPreview\Extract\OEmbedExtractor;
 use Rasuvaeff\LinkPreview\Extract\OEmbedResponse;
+use Rasuvaeff\LinkPreview\Extract\UrlContext;
 use Rasuvaeff\LinkPreview\Fetch\Fetcher;
 use Rasuvaeff\LinkPreview\Html\PageDocument;
 use Rasuvaeff\LinkPreview\Tests\Support\Adapters;
@@ -20,6 +22,8 @@ use Testo\Test;
 #[Test]
 #[Covers(OEmbedExtractor::class)]
 #[Covers(OEmbedResponse::class)]
+#[Covers(Json::class)]
+#[Covers(UrlContext::class)]
 final class OEmbedExtractorTest
 {
     private const string PAGE = 'https://example.com/post/1';
@@ -165,5 +169,13 @@ final class OEmbedExtractorTest
         $extractor = new OEmbedExtractor(new Fetcher(client: $client, requestFactory: new HttpFactory()));
 
         return $extractor->extract(document: PageDocument::parse('<head>' . $head . '</head>'), pageUrl: self::PAGE);
+    }
+
+    public function theIframeIsFoundWhateverItsCaseAndItsQuotesAreDecoded(): void
+    {
+        $embed = static fn(string $html): ?string => OEmbedResponse::parse((string) json_encode(['title' => 'T', 'html' => $html]), 'https://example.com/o')->value()?->embedUrl;
+
+        Assert::same($embed('<IFRAME WIDTH="1" SRC="https://p.example.net/e"></IFRAME>'), 'https://p.example.net/e');
+        Assert::same($embed('<iframe src="https://p.example.net/e?a=x&#39;y&quot;z"></iframe>'), "https://p.example.net/e?a=x'y\"z");
     }
 }
