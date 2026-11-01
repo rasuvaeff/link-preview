@@ -5,12 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.0.0 — 2026-11-01
+
+- Stable release on `rasuvaeff/schema` ^1.0 and `rasuvaeff/json-ld` ^1.0
+  (`rasuvaeff/pinned-http-client` ^1.0 suggested). The public API and
+  behaviour are those of 0.3.0, checked in the cska-one pilot; from here on
+  SemVer applies strictly.
+- Docs: `siteName` falls back to `providerName` whether or not
+  `hostAsSiteName` is on (the 0.3.0 note said otherwise).
+
 ## 0.3.0 — 2026-11-01
 
 Findings of the cska-one consumer pilot:
 
-- `siteName` falls back to `providerName` before the host (`hostAsSiteName`):
-  a card known only by its oEmbed provider is no longer signed by its domain.
+- `siteName` falls back to `providerName` (always), and only then to the host
+  when `hostAsSiteName` is on: a card known only by its oEmbed provider is no
+  longer signed by its domain.
 - A pinning client's own body limit (`rasuvaeff/pinned-http-client`
   `ResponseTooLarge`) is `TooLarge`, not `ClientRefused` — the two limits no
   longer need the "+1 byte" dance to tell a big body from a refusal.

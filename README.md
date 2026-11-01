@@ -96,7 +96,7 @@ The pipeline is `UrlPolicy` -> site adapter (YouTube, Wikipedia, ...) -> `Fetche
 
 `providerName` is the service behind the content: oEmbed `provider_name`, or the site adapter (`Wikipedia`, `GitHub`, ...). `toArray()` returns all fifteen keys; `PageInfo::fromArray($array)` reads them back (`fromArray($info->toArray())->toArray() === $info->toArray()`), treats missing keys as `null` - an array stored by 0.1 still reads - and throws `InvalidArgumentException` on a wrong type.
 
-`siteName` is only what a source said. To show the host when nothing names the site, opt in: `new PreviewProvider(fetcher: $fetcher, hostAsSiteName: true)` - the host of `url` without `www.`, in its ASCII form (`xn--mnchen-3ya.de`, not a Unicode look-alike). It is opt-in so that a `siteName` you store or compare is never a guess.
+`siteName` is only what a source said — the page's own site name, or else the oEmbed/adapter `providerName` (always, with or without the option below). To show the host when nothing names the site, opt in: `new PreviewProvider(fetcher: $fetcher, hostAsSiteName: true)` - the host of `url` without `www.`, in its ASCII form (`xn--mnchen-3ya.de`, not a Unicode look-alike). It is opt-in so that a `siteName` you store or compare is never a guess.
 
 ### Failures
 

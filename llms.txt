@@ -56,7 +56,7 @@ $provider = new PreviewProvider(
     extractors: null, // default: OEmbedExtractor, JsonLdExtractor, OpenGraphExtractor, TwitterCardsExtractor, HtmlFallbackExtractor
     limits: new Limits(titleLength: 200, descriptionLength: 500, siteNameLength: 100, authorNameLength: 100, maxUrlLength: 2048, httpsImagesOnly: false),
     adapters: null,   // default: AdapterRegistry::standard(); new AdapterRegistry() = off
-    hostAsSiteName: false, // true: siteName falls back to the host of url without www. (ASCII)
+    hostAsSiteName: false, // siteName = site name ?? providerName (always); true adds a last fallback: host of url without www. (ASCII)
 );
 
 $result = $provider->preview(url: 'https://example.com/article'); // Result<PageInfo, PreviewFailure>
