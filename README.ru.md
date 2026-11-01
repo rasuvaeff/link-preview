@@ -96,7 +96,7 @@ if ($result->isOk()) {
 
 `providerName` - сервис за контентом: `provider_name` из oEmbed или адаптер сайта (`Wikipedia`, `GitHub`, ...). `toArray()` возвращает все пятнадцать ключей; `PageInfo::fromArray($array)` читает их обратно (`fromArray($info->toArray())->toArray() === $info->toArray()`), отсутствующие ключи считает `null` - массив, сохранённый версией 0.1, читается - и бросает `InvalidArgumentException` на неверный тип.
 
-`siteName` - только то, что сказал источник. Чтобы показывать хост, когда сайт никто не назвал, включите явно: `new PreviewProvider(fetcher: $fetcher, hostAsSiteName: true)` - хост `url` без `www.`, в ASCII-форме (`xn--mnchen-3ya.de`, а не Unicode-двойник). Опция выключена по умолчанию, чтобы сохраняемый или сравниваемый `siteName` никогда не был догадкой.
+`siteName` - только то, что сказал источник: собственное имя сайта страницы, а если его нет - `providerName` из oEmbed или адаптера (всегда, с опцией ниже или без неё). Чтобы показывать хост, когда сайт никто не назвал, включите явно: `new PreviewProvider(fetcher: $fetcher, hostAsSiteName: true)` - хост `url` без `www.`, в ASCII-форме (`xn--mnchen-3ya.de`, а не Unicode-двойник). Опция выключена по умолчанию, чтобы сохраняемый или сравниваемый `siteName` никогда не был догадкой.
 
 ### Отказы
 
