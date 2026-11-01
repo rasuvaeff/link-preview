@@ -68,7 +68,7 @@ foreach ($arguments as $argument) {
             $page = str_contains($response['type'], 'json') ? $fetcher->fetchJson(url: $url) : $fetcher->fetch(url: $url);
 
             if ($page->isErr()) {
-                fwrite(STDERR, sprintf("skip %s: %s\n", $url, $page->error()?->value));
+                fwrite(STDERR, sprintf("skip %s: %s\n", $url, $page->error()?->reason->value));
 
                 continue;
             }

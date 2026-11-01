@@ -5,16 +5,19 @@ declare(strict_types=1);
 namespace Rasuvaeff\LinkPreview;
 
 use InvalidArgumentException;
+use Rasuvaeff\LinkPreview\Text\PlainText;
 
 /**
  * Bounds on what a preview may carry into a template or a database.
  *
- * Text is scrubbed of invalid UTF-8 and control characters, runs of whitespace
- * collapse to one space, and what is still too long is cut at a character (not
- * byte) boundary with a trailing `…` that counts toward the limit. Applying
- * the limits twice changes nothing. An image or favicon that is not http(s),
- * is longer than `maxUrlLength`, or — with `httpsImagesOnly` — is plain http,
- * is dropped.
+ * Text comes out clean: invalid UTF-8 is scrubbed, HTML entities are decoded
+ * (double escaping such as `&amp;quot;` included), tags are removed, control
+ * characters and runs of whitespace collapse to one space - and only then is
+ * what is still too long cut at a character (not byte) boundary with a
+ * trailing `…` that counts toward the limit. Applying the limits twice changes
+ * nothing. An image, favicon or embed URL that is longer than `maxUrlLength`,
+ * or - with `httpsImagesOnly` - is plain http, is dropped (an image together
+ * with its dimensions); an over-long canonical URL is dropped as well.
  *
  * @api
  */
@@ -23,7 +26,8 @@ final readonly class Limits
     private const string ELLIPSIS = '…';
 
     /**
-     * @param int $titleLength in characters, at least 1
+     * @param int $titleLength in characters, at least 1; every length counts the text after cleaning
+     * @param int $siteNameLength also bounds `providerName`
      */
     public function __construct(
         private int $titleLength = 200,
@@ -42,11 +46,13 @@ final readonly class Limits
 
     public function apply(PageInfo $info): PageInfo
     {
+        $image = $this->imageUrl($info->image);
+
         return new PageInfo(
             url: $info->url,
             title: $this->text($info->title, $this->titleLength),
             description: $this->text($info->description, $this->descriptionLength),
-            image: $this->imageUrl($info->image),
+            image: $image,
             favicon: $this->imageUrl($info->favicon),
             siteName: $this->text($info->siteName, $this->siteNameLength),
             language: $info->language,
@@ -54,24 +60,21 @@ final readonly class Limits
             publishedTime: $info->publishedTime,
             type: $info->type,
             embedUrl: $this->imageUrl($info->embedUrl),
+            canonicalUrl: $info->canonicalUrl === null || \strlen($info->canonicalUrl) > $this->maxUrlLength ? null : $info->canonicalUrl,
+            imageWidth: $image === null ? null : $info->imageWidth,
+            imageHeight: $image === null ? null : $info->imageHeight,
+            providerName: $this->text($info->providerName, $this->siteNameLength),
         );
     }
 
     /**
+     * @return non-empty-string|null
      */
     private function text(?string $value, int $limit): ?string
     {
-        if ($value === null) {
-            return null;
-        }
+        $text = PlainText::clean($value);
 
-        $text = trim(preg_replace('/[\s\p{Cc}]+/u', ' ', mb_scrub($value, 'UTF-8')) ?? '');
-
-        if ($text === '') {
-            return null;
-        }
-
-        if (mb_strlen($text, 'UTF-8') <= $limit) {
+        if ($text === null || mb_strlen($text, 'UTF-8') <= $limit) {
             return $text;
         }
 

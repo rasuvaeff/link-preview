@@ -9,8 +9,9 @@ use Rasuvaeff\Result\Result;
 
 /**
  * Reads an oEmbed JSON response (oembed.com): `title`, `author_name`,
- * `provider_name`, `thumbnail_url` (or `url` of a photo), the `<iframe src>` of
- * `html` as the embed, `type` as the page type.
+ * `provider_name` (as the provider and the site name), `thumbnail_url` with
+ * `thumbnail_width` / `thumbnail_height` (or `url`, `width`, `height` of a
+ * photo), the `<iframe src>` of `html` as the embed, `type` as the page type.
  *
  * @internal
  */
@@ -45,10 +46,15 @@ final readonly class OEmbedResponse
     {
         $type = Json::string($data['type'] ?? null);
         $image = Json::string($data['thumbnail_url'] ?? null);
+        $sides = ['thumbnail_width', 'thumbnail_height'];
 
         if ($image === null && $type === 'photo') {
             $image = Json::string($data['url'] ?? null);
+            $sides = ['width', 'height'];
         }
+
+        $image = $image === null ? null : UrlResolver::resolve(base: $baseUrl, reference: $image);
+        $provider = Json::string($data['provider_name'] ?? null);
 
         $html = Json::string($data['html'] ?? null);
         $embed = $html !== null && preg_match('/<iframe\b[^>]*?\ssrc\s*=\s*["\']([^"\']+)["\']/i', $html, $matches) === 1
@@ -57,11 +63,14 @@ final readonly class OEmbedResponse
 
         $metadata = new Metadata(
             title: Json::string($data['title'] ?? null),
-            image: $image === null ? null : UrlResolver::resolve(base: $baseUrl, reference: $image),
-            siteName: Json::string($data['provider_name'] ?? null),
+            image: $image,
+            siteName: $provider,
             authorName: Json::string($data['author_name'] ?? null),
             type: $type,
             embedUrl: $embed,
+            imageWidth: $image === null ? null : Values::dimension($data[$sides[0]] ?? null),
+            imageHeight: $image === null ? null : Values::dimension($data[$sides[1]] ?? null),
+            providerName: $provider,
         );
 
         return $metadata->isEmpty() ? null : $metadata;

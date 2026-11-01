@@ -30,5 +30,5 @@ $client = new class implements ClientInterface {
 
 $result = (new Fetcher(client: $client, requestFactory: new HttpFactory()))->fetch(url: 'https://short.example/a');
 
-echo 'result: ', $result->error()?->value, "\n";
+echo 'result: ', $result->error()?->reason->value, "\n";
 echo "requests actually sent:\n  ", implode("\n  ", $client->requested), "\n";

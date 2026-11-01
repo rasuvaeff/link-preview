@@ -3,65 +3,121 @@
 Install:
 
 ```
-composer require rasuvaeff/link-preview   # brings rasuvaeff/json-ld
-composer require guzzlehttp/guzzle   # any PSR-18 client + PSR-17 request factory
+composer require rasuvaeff/link-preview          # brings rasuvaeff/json-ld, rasuvaeff/schema, rasuvaeff/result
+composer require rasuvaeff/pinned-http-client    # recommended PSR-18 client (DNS pinning); any PSR-18 client + PSR-17 request factory works
 ```
 
 ## Rules
 
 - PHP 8.3+, `declare(strict_types=1)`, ext dom/libxml/mbstring/intl/ctype/filter
-- Everything returns `Rasuvaeff\Result\Result` with an enum failure; nothing throws on bad network input
-- The PSR-18 client MUST NOT follow redirects (Guzzle `allow_redirects => false`): `Fetcher` follows them itself and applies `UrlPolicy` to every hop
-- No DNS pinning inside the package (PSR-18 has no hook); timeouts belong to the client; close rebinding with `rasuvaeff/pinned-http-client` as the Fetcher's client (see `examples/with_pinned_client.php`) or a trusted resolving egress proxy
-- JSON-LD is read by `ProcessorJsonLdReader` over `rasuvaeff/json-ld` (a dependency): inline contexts and aliases work, the schema.org context is answered from memory, any other remote context skips the block; replace it through the `JsonLdReader` interface
-- Output URLs are absolute http(s) only; text is plain (escape it when rendering)
-- Source priority per field: site adapter > oEmbed (discovered) > JSON-LD > OpenGraph > Twitter Cards > HTML
-- Adapter tokens (Instagram, Facebook required; Twitter optional) are constructor args, sent as Authorization headers to the API host only, never in URLs; no token = AdapterFailure::MissingToken, no request
+- Everything returns `Rasuvaeff\Result\Result`; nothing throws on bad input from a user or the network (`fetchMedia()` throws `InvalidArgumentException` only for a bad type list / limit: a programming error)
+- The PSR-18 client MUST NOT follow redirects (`PinnedClient` does not, do not wrap it in `RedirectFollower`; Guzzle `allow_redirects => false`): `Fetcher` follows them itself and applies `UrlPolicy` to every hop
+- No DNS pinning inside the package; close rebinding with `rasuvaeff/pinned-http-client` whose `AddressPolicy` is `UrlPolicy::allowsAddress()` (see Quickstart), or a trusted resolving egress proxy; timeouts belong to the client
+- `PageInfo::$url` = the fetched URL (after redirects, normalised) - link the card here; `canonicalUrl` = what the page claims (`og:url`, canonical, JSON-LD, adapter), any host, dedup only
+- Text fields are CLEAN plain text: entities decoded (double escaping too), tags removed, whitespace/control chars collapsed, then clipped; still escape when rendering
+- Failures are value objects: `PreviewFailure` / `FetchFailure` with `reason` enum, `status`, `retryAfterSeconds`, `isTransient()`
+- Source priority per field: site adapter > oEmbed (discovered) > JSON-LD > OpenGraph > Twitter Cards > HTML; image + its width/height merge as one field
+- Built-in adapters are internal: `AdapterRegistry::standard(...)`, custom ones first via `->with(...)`
+- Adapter tokens (Instagram, Facebook required; Twitter optional) are `standard()` args, sent as Authorization headers to the API host only, never in URLs; no token = AdapterFailure::MissingToken, no request
 - Namespace `Rasuvaeff\LinkPreview`
 
-## API
+## Quickstart
 
 ```php
-use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\HttpFactory;
 use Rasuvaeff\LinkPreview\Fetch\Fetcher;
 use Rasuvaeff\LinkPreview\Fetch\UrlPolicy;
 use Rasuvaeff\LinkPreview\Fetch\UserAgentMap;
 use Rasuvaeff\LinkPreview\Limits;
 use Rasuvaeff\LinkPreview\PreviewProvider;
+use Rasuvaeff\PinnedHttpClient\AddressPolicy;
+use Rasuvaeff\PinnedHttpClient\PinnedClient;
+
+$policy = new UrlPolicy(allowedNetworks: [], allowedPorts: [80, 443]);
 
 $provider = new PreviewProvider(
     fetcher: new Fetcher(
-        client: new Client(['allow_redirects' => false, 'http_errors' => false, 'timeout' => 5.0]),
+        client: new PinnedClient(
+            policy: new class ($policy) implements AddressPolicy {
+                public function __construct(private UrlPolicy $policy) {}
+                public function allows(string $address): bool { return $this->policy->allowsAddress($address); }
+            },
+            timeoutSeconds: 5.0,
+            connectTimeoutSeconds: 3.0,
+            maxBodyBytes: 2_097_153, // > Fetcher maxBodyBytes, so oversize = FetchFailureReason::TooLarge
+        ),
         requestFactory: new HttpFactory(),
-        policy: new UrlPolicy(allowedNetworks: [], allowedPorts: [80, 443]),
-        userAgents: UserAgentMap::unfurler(['t.me' => 'TelegramBot (like TwitterBot)']), // Twitterbot/1.0 everywhere: VK and others refuse the default name
+        policy: $policy,
+        userAgents: UserAgentMap::unfurler(['t.me' => 'TelegramBot (like TwitterBot)']), // Twitterbot/1.0 everywhere
         maxRedirects: 5,
         maxBodyBytes: 2_097_152,
         chainBudgetSeconds: 10.0, // checked between hops only
     ),
     extractors: null, // default: OEmbedExtractor, JsonLdExtractor, OpenGraphExtractor, TwitterCardsExtractor, HtmlFallbackExtractor
-    adapters: null,   // default: AdapterRegistry::standard(); new AdapterRegistry() = off
     limits: new Limits(titleLength: 200, descriptionLength: 500, siteNameLength: 100, authorNameLength: 100, maxUrlLength: 2048, httpsImagesOnly: false),
+    adapters: null,   // default: AdapterRegistry::standard(); new AdapterRegistry() = off
+    hostAsSiteName: false, // true: siteName falls back to the host of url without www. (ASCII)
 );
 
 $result = $provider->preview(url: 'https://example.com/article'); // Result<PageInfo, PreviewFailure>
-$result = $provider->fromHtml(html: $html, pageUrl: 'https://example.com/a', charset: 'windows-1251'); // no network
+$result = $provider->fromHtml(html: $html, pageUrl: 'https://example.com/a', charset: 'windows-1251'); // pageUrl must pass UrlPolicy, else PolicyRejected
 
 $info = $result->unwrap();
-$info->url; $info->title; $info->description; $info->image; $info->favicon;
-$info->siteName; $info->language; $info->authorName; $info->publishedTime; $info->type; // all ?string except url, publishedTime ?DateTimeImmutable
-$info->toArray();
-
-$result->error(); // PreviewFailure: PolicyRejected, Network, TooManyRedirects, InvalidRedirect,
-                  // BudgetExceeded, HttpStatus, NotHtml, TooLarge, EmptyPage
+$info->url; $info->canonicalUrl; $info->title; $info->description; $info->image; $info->imageWidth; $info->imageHeight;
+$info->favicon; $info->siteName; $info->providerName; $info->language; $info->authorName; $info->publishedTime; $info->type; $info->embedUrl;
+// strings/ints are nullable except url; publishedTime ?DateTimeImmutable; imageWidth/imageHeight ?int (>= 1, only with image)
+$array = $info->toArray();               // 15 keys, PageInfoArray psalm shape
+$same = PageInfo::fromArray($array);     // inverse; missing keys = null; wrong types -> InvalidArgumentException
 ```
+
+### Failures
+
+```php
+$failure = $result->error(); // ?PreviewFailure
+$failure->reason;            // PreviewFailureReason
+$failure->status;            // ?int<100,599>, for HttpStatus
+$failure->retryAfterSeconds; // ?int<0,max>: Retry-After delta-seconds, or HTTP-date minus response Date; capped at 86400
+$failure->isTransient();     // retry later?
+```
+
+| reason | transient |
+|---|---|
+| PolicyRejected | no |
+| Network (client threw NetworkExceptionInterface) | yes |
+| ClientRefused (any other ClientExceptionInterface, e.g. pinning refusal) | no |
+| TooManyRedirects, InvalidRedirect | no |
+| BudgetExceeded | yes |
+| HttpStatus | yes for 408, 425, 429, 5xx; else no |
+| UnexpectedContentType | no |
+| TooLarge | no |
+| MissingToken | no |
+| EmptyPage | no |
+
+`FetchFailure` / `FetchFailureReason` (Fetcher) have the same shape and reasons without MissingToken/EmptyPage; `PreviewFailure::fromFetch()` maps.
+
+### Decorating
+
+```php
+use Rasuvaeff\LinkPreview\LinkPreviewer; // preview(string $url): Result; fromHtml(string $html, string $pageUrl, ?string $charset = null): Result
+
+final class Cached implements LinkPreviewer { /* store $info->toArray(), read with PageInfo::fromArray(); do not cache transient failures */ }
+```
+
+### Limits (clean text)
+
+title/description/siteName/authorName/providerName: mb_scrub -> html_entity_decode (repeat, max 4 rounds) -> tags/comments/doctypes
+replaced by a space (`a < b`, `<3` stay) -> `[\s\p{Cc}]+` to one space, trim -> clip by characters with `…` (counts toward the limit).
+Text escaped deeper than 4 levels: remaining `&`/`<` become `＆`/`＜`. Idempotent; output has no decodable entity and no tag.
+Markup-only values become null and fall through to the next source during the merge.
+providerName uses siteNameLength. image/favicon/embedUrl over maxUrlLength (or http with httpsImagesOnly) dropped, image with its sizes;
+canonicalUrl over maxUrlLength dropped.
 
 ### UrlPolicy
 
 ```php
 $policy = new UrlPolicy();
 $policy->check(url: 'HTTPS://Example.COM:443/a#f'); // Result<string, UrlRejection>, ok = 'https://example.com/a'
+$policy->allowsAddress('93.184.216.34');            // bool: plain IPv4/IPv6 literal, same ranges + allowedNetworks as check()
 // UrlRejection: Malformed, Scheme, Credentials, MissingHost, InvalidHost, NonCanonicalIp, Port, PrivateAddress
 ```
 
@@ -74,13 +130,17 @@ IDN hosts are converted to ASCII. Names are never resolved. `allowedNetworks` (C
 ### Fetcher
 
 ```php
-$page = $fetcher->fetch(url: 'https://example.com/'); // Result<FetchedPage, FetchFailure>
-// FetchedPage: url (final), body, contentType, charset, redirects
-// FetchFailure: PolicyRejected, Network, TooManyRedirects, InvalidRedirect, BudgetExceeded, HttpStatus, NotHtml, TooLarge
+$page = $fetcher->fetch(url: 'https://example.com/');          // Result<FetchedPage, FetchFailure>; text/html, application/xhtml+xml
+$json = $fetcher->fetchJson(url: $api, headers: ['Authorization' => 'Bearer <token>']); // headers to the first host only
+$img = $fetcher->fetchMedia(url: $info->image, acceptedTypes: ['image/*', 'video/mp4'], maxBytes: 5_242_880); // own limit
+$fetcher->check(url: $url);                                    // Result<string, UrlRejection>
+// FetchedPage: url (final), body, contentType (lower-case, no params), charset, redirects
 ```
 
-Only text/html and application/xhtml+xml, 2xx, body <= maxBodyBytes. Redirects 301/302/303/307/308, `Location` resolved
-against the current URL, policy checked before each request.
+2xx only, body <= limit (Content-Length checked first). Redirects 301/302/303/307/308, `Location` resolved against the current URL,
+policy checked before each request. fetchMedia types: lower-case `type/subtype` or `type/*`.
+The client's own body limit still applies to fetchMedia (PinnedClient maxBodyBytes < maxBytes -> ClientRefused):
+use a separate media Fetcher over `$pinned->withMaxBodyBytes($mediaMax + 1)`.
 
 ### Extractors and documents
 
@@ -99,7 +159,10 @@ $document->images();              // list<array{src, width, height}>
 ```
 
 Implement `Rasuvaeff\LinkPreview\Extract\Extractor` to add a source; pass it in `extractors:` (highest priority first).
-Per-field merge: the first extractor that has the field wins. Page URL = `og:url` > `canonical` > fetched URL.
+`Metadata` fields: url (claimed -> canonicalUrl), title, description, image, favicon, siteName, language, authorName,
+publishedTime, type, embedUrl, imageWidth, imageHeight, providerName.
+Sizes: og:image:width/height (first), twitter:image:width/height, <img width height>, oEmbed thumbnail_width/height
+(photo: width/height), JSON-LD ImageObject width/height (number, digits, QuantitativeValue); positive int < 100000.
 
 ### Site adapters
 
@@ -111,15 +174,12 @@ AdapterRegistry::standard(
     instagramToken: '<token>',   // required for Instagram, else MissingToken
     facebookToken: '<token>',    // required for Facebook, else MissingToken
     twitchParents: ['example.com'], // needed for a Twitch embedUrl
-);
+)->with(new MyAdapter());        // custom adapters first; first matching domain wins (override a built-in)
 ```
-
-JSON answers are parsed by `Extract\Schemas` (rasuvaeff/schema: `oEmbed()`, `wikipediaSummary()`, `rutubeVideo()`; `->arbitrary()` generates valid ones for tests);
-a wrong-typed field = AdapterFailure::InvalidResponse + `$context->diagnostics()` (paths only, no values).
 
 YouTube, TikTok, Twitter/X, Twitch (oEmbed), Wikipedia (REST summary), GitHub (OG, gists), Instagram, Facebook (Graph API oEmbed),
 Telegram (OG + widget), VK (OG + video_ext.php), Rutube (video API). Hosts match by labels: www./m./subdomains yes,
 `youtube.com.evil.example` no. Custom site: implement `Adapter` (`domains(): list<string>`, `preview(string $url, AdapterContext $context): Result<Metadata, AdapterFailure>`)
 and use `$context->html($url)` / `$context->json($url, $headers)` - the only way to reach the network, always under UrlPolicy.
-AdapterFailure: MissingToken, UnsupportedUrl, Unavailable, InvalidResponse. PreviewFailure also has MissingToken.
-`PageInfo::$embedUrl` is an absolute http(s) player URL when the source knows one.
+JSON answers are shape-checked; a wrong-typed field = AdapterFailure::InvalidResponse + `$context->diagnostics()` (paths only, no values).
+AdapterFailure: MissingToken, UnsupportedUrl, Unavailable, InvalidResponse.

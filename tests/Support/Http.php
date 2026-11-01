@@ -65,6 +65,17 @@ final class Http
     }
 
     /**
+     * A client that refuses every request without a network error (`ClientExceptionInterface` only).
+     */
+    public static function refusing(): ClientInterface
+    {
+        $client = Understudy::for(ClientInterface::class);
+        when(fn() => $client->sendRequest(Arg::any()))->throws(new RefusedRequest('address not allowed'));
+
+        return $client;
+    }
+
+    /**
      * @return list<RequestInterface>
      */
     public static function requests(ClientInterface $client): array

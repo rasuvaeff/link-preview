@@ -120,4 +120,42 @@ final class AdapterRegistryTest
         yield 'subdomain' => ['wikipedia.org', 'subdomain', 'en'];
         yield 'upper' => ['fb.watch', 'upper', 'a'];
     }
+
+    public function withPutsCustomAdaptersFirst(): void
+    {
+        $own = new class implements Adapter {
+            public function domains(): array
+            {
+                return ['youtube.com', 'example.org'];
+            }
+
+            public function preview(string $url, AdapterContext $context): \Rasuvaeff\Result\Result
+            {
+                throw new \LogicException('not used');
+            }
+        };
+        $other = new class implements Adapter {
+            public function domains(): array
+            {
+                return ['example.org', 'example.net'];
+            }
+
+            public function preview(string $url, AdapterContext $context): \Rasuvaeff\Result\Result
+            {
+                throw new \LogicException('not used');
+            }
+        };
+
+        $standard = AdapterRegistry::standard();
+        $registry = $standard->with($own, $other);
+
+        Assert::same($registry->find('www.youtube.com'), $own);
+        Assert::same($registry->find('example.org'), $own);
+        Assert::same($registry->find('example.net'), $other);
+        Assert::same($registry->find('youtu.be'), $standard->find('youtu.be'));
+        Assert::same($registry->find('tiktok.com')?->domains(), ['tiktok.com']);
+        Assert::null($standard->find('example.org'));
+        Assert::same((new AdapterRegistry())->with($own)->find('example.org'), $own);
+        Assert::null((new AdapterRegistry())->with()->find('youtube.com'));
+    }
 }

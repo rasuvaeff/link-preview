@@ -14,7 +14,7 @@ $url = 'https://www.instagram.com/p/CxYz123AbC/';
 
 echo "without a token:\n";
 $result = (new PreviewProvider(fetcher: $fetcherFor('instagram')))->preview(url: $url);
-echo '  result: ', $result->error()?->value, "\n";
+echo '  result: ', $result->error()?->reason->value, "\n";
 
 echo "with a token (read it from your secrets store; '<token>' stands for it):\n";
 $provider = new PreviewProvider(

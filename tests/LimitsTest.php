@@ -8,6 +8,7 @@ use InvalidArgumentException;
 use Rasuvaeff\LinkPreview\Limits;
 use Rasuvaeff\LinkPreview\PageInfo;
 use Rasuvaeff\LinkPreview\Tests\Support\TextGenerators;
+use Rasuvaeff\LinkPreview\Text\PlainText;
 use Rasuvaeff\PropertyTesting\Classify;
 use Rasuvaeff\PropertyTesting\Property;
 use Testo\Assert;
@@ -104,6 +105,65 @@ final class LimitsTest
         yield 'empty is nothing' => ['', null];
         yield 'emoji are kept' => ['Party 😀', 'Party 😀'];
         yield 'zero-width joiner is kept' => ["👨\u{200D}👩", "👨\u{200D}👩"];
+        yield 'entities are decoded' => ['Tom &amp; Jerry', 'Tom & Jerry'];
+        yield 'double escaping is undone' => ['&amp;quot;Hi&amp;quot;', '"Hi"'];
+        yield 'tags are removed' => ['<b>Bold</b> <i>move</i>', 'Bold move'];
+        yield 'markup only is nothing' => ['<b></b>&nbsp;', null];
+    }
+
+    public function textIsCleanedBeforeItIsClipped(): void
+    {
+        $limits = new Limits(titleLength: 5);
+
+        Assert::same($limits->apply($this->info(title: '<span class="very-long-class-name">abcde</span>'))->title, 'abcde');
+        Assert::same($limits->apply($this->info(title: '&amp;amp;&amp;amp;&amp;amp;&amp;amp;&amp;amp;'))->title, '&&&&&');
+    }
+
+    public function everyTextFieldIsCleaned(): void
+    {
+        $info = (new Limits())->apply(new PageInfo(
+            url: 'https://example.com/',
+            title: '<b>T</b>',
+            description: '&lt;p&gt;D&lt;/p&gt;',
+            siteName: 'S&amp;S',
+            authorName: "A\nB",
+            providerName: '<i>P</i>',
+        ));
+
+        Assert::same($info->title, 'T');
+        Assert::same($info->description, 'D');
+        Assert::same($info->siteName, 'S&S');
+        Assert::same($info->authorName, 'A B');
+        Assert::same($info->providerName, 'P');
+    }
+
+    public function providerNameSharesTheSiteNameLimit(): void
+    {
+        $info = (new Limits(siteNameLength: 3))->apply(new PageInfo(url: 'https://example.com/', providerName: 'abcd'));
+
+        Assert::same($info->providerName, 'ab…');
+    }
+
+    public function aDroppedImageTakesItsDimensionsAlong(): void
+    {
+        $limits = new Limits(maxUrlLength: 30, httpsImagesOnly: true);
+        $kept = $limits->apply(new PageInfo(url: 'https://example.com/', image: 'https://example.com/i.png', imageWidth: 10, imageHeight: 20));
+        $tooLong = $limits->apply(new PageInfo(url: 'https://example.com/', image: 'https://example.com/' . str_repeat('a', 20), imageWidth: 10, imageHeight: 20));
+        $plainHttp = $limits->apply(new PageInfo(url: 'https://example.com/', image: 'http://example.com/i.png', imageWidth: 10, imageHeight: 20));
+
+        Assert::same([$kept->imageWidth, $kept->imageHeight], [10, 20]);
+        Assert::same([$tooLong->image, $tooLong->imageWidth, $tooLong->imageHeight], [null, null, null]);
+        Assert::same([$plainHttp->image, $plainHttp->imageWidth, $plainHttp->imageHeight], [null, null, null]);
+    }
+
+    public function anOverlongCanonicalUrlIsDropped(): void
+    {
+        $limits = new Limits(maxUrlLength: 30);
+        $fits = 'https://example.com/' . str_repeat('a', 10);
+
+        Assert::same($limits->apply(new PageInfo(url: 'https://example.com/', canonicalUrl: $fits))->canonicalUrl, $fits);
+        Assert::null($limits->apply(new PageInfo(url: 'https://example.com/', canonicalUrl: $fits . 'a'))->canonicalUrl);
+        Assert::same((new Limits(httpsImagesOnly: true))->apply(new PageInfo(url: 'https://example.com/', canonicalUrl: 'http://example.com/'))->canonicalUrl, 'http://example.com/');
     }
 
     public function invalidUtf8IsScrubbed(): void
@@ -189,7 +249,7 @@ final class LimitsTest
         $limits = new Limits(titleLength: $limit);
         $once = $limits->apply($this->info(title: $text))->title;
         $twice = $limits->apply($this->info(title: $once))->title;
-        $normalized = trim((string) preg_replace('/[\s\p{Cc}]+/u', ' ', $text));
+        $normalized = PlainText::clean($text) ?? '';
 
         Assert::same($twice, $once);
 
@@ -213,6 +273,40 @@ final class LimitsTest
         yield 'trailing space at the cut' => ['ab cd', 3];
         yield 'emoji at the cut' => ['😀😀😀😀', 3];
         yield 'limit one' => ['ab', 1];
+    }
+
+    /**
+     * With markup in the text the bound still holds - it is counted on the clean
+     * text - and what comes out is clean and stable.
+     */
+    #[Property(runs: 300, generators: [TextGenerators::class, 'clippedMarkup'], timeoutMs: 250)]
+    public function markupIsCleanedThenClipped(string $text, int $limit): void
+    {
+        $limits = new Limits(titleLength: $limit);
+        $once = $limits->apply($this->info(title: $text))->title;
+        $clean = PlainText::clean($text);
+
+        Assert::same($limits->apply($this->info(title: $once))->title, $once);
+
+        if ($once === null) {
+            Assert::null($clean);
+        } else {
+            Assert::true(mb_strlen($once) <= $limit);
+            Assert::same(html_entity_decode($once, ENT_QUOTES | ENT_HTML5, 'UTF-8'), $once);
+            Assert::same(preg_match('~<(?:/?[A-Za-z]|[!?])[^<>]*>~', $once), 0);
+            Assert::same($once === $clean, mb_strlen((string) $clean) <= $limit);
+        }
+
+        Classify::cover(condition: $clean !== null && mb_strlen($clean) > $limit, label: 'cut', minPercent: 10.0);
+        Classify::cover(condition: $clean !== null && mb_strlen($clean) <= $limit, label: 'kept', minPercent: 10.0);
+    }
+
+    /** @return iterable<string, array{string, int}> */
+    public static function markupIsCleanedThenClippedExamples(): iterable
+    {
+        yield 'a cut through an entity of the raw text' => ['&amp;amp;amp;', 2];
+        yield 'a cut where a tag was' => ['ab<br>cd', 3];
+        yield 'one past the decoding bound' => ['&amp;amp;amp;amp;lt;b&amp;amp;amp;amp;gt;x', 4];
     }
 
     private function info(

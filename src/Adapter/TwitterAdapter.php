@@ -17,7 +17,7 @@ use Rasuvaeff\Result\Result;
  * Works without a token. A token, when given, is sent as a bearer
  * `Authorization` header to `publish.twitter.com` only - never in the URL.
  *
- * @api
+ * @internal reached through {@see AdapterRegistry::standard()}
  */
 final readonly class TwitterAdapter implements Adapter
 {

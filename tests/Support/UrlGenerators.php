@@ -47,6 +47,14 @@ final readonly class UrlGenerators
     /**
      * @return array<string, ArbitraryInterface>
      */
+    public static function address(): array
+    {
+        return self::octets();
+    }
+
+    /**
+     * @return array<string, ArbitraryInterface>
+     */
     public static function embedded(): array
     {
         return [

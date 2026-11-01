@@ -6,7 +6,7 @@ namespace Rasuvaeff\LinkPreview\Tests;
 
 use GuzzleHttp\Psr7\HttpFactory;
 use Rasuvaeff\LinkPreview\Fetch\Fetcher;
-use Rasuvaeff\LinkPreview\PreviewFailure;
+use Rasuvaeff\LinkPreview\PreviewFailureReason;
 use Rasuvaeff\LinkPreview\PreviewProvider;
 use Rasuvaeff\LinkPreview\Tests\Support\Fixtures;
 use Rasuvaeff\LinkPreview\Tests\Support\Http;
@@ -23,7 +23,7 @@ use Testo\Test;
 final class PageCorpusTest
 {
     /**
-     * @param array<string, string|null> $expected
+     * @param array<string, string|int|null> $expected
      */
     #[DataProvider('pageProvider')]
     public function previews(string $fixture, string $pageUrl, ?string $charset, array $expected): void
@@ -42,16 +42,22 @@ final class PageCorpusTest
             'publishedTime' => null,
             'type' => null,
             'embedUrl' => null,
+            'canonicalUrl' => null,
+            'imageWidth' => null,
+            'imageHeight' => null,
+            'providerName' => null,
         ], $expected));
     }
 
     public static function pageProvider(): iterable
     {
         yield 'OpenGraph beats Twitter and HTML' => ['og-article.html', 'https://example.com/news/article.html', null, [
-            'url' => 'https://example.com/articles/42',
+            'canonicalUrl' => 'https://example.com/articles/42',
             'title' => 'The OpenGraph title & more',
             'description' => 'Line one. Line two.',
             'image' => 'https://example.com/img/cover.jpg',
+            'imageWidth' => 1200,
+            'imageHeight' => 630,
             'favicon' => 'https://example.com/favicon.ico',
             'siteName' => 'Example News',
             'language' => 'ru-RU',
@@ -65,16 +71,18 @@ final class PageCorpusTest
             'image' => 'https://example.com/a/img/card.png',
         ]];
         yield 'plain HTML' => ['plain.html', 'https://example.com/de/plain.html', null, [
-            'url' => 'https://example.com/de/plain',
+            'canonicalUrl' => 'https://example.com/de/plain',
             'title' => 'Plain page',
             'description' => 'A page with no social metadata',
             'image' => 'https://example.com/hero.jpg',
+            'imageWidth' => 800,
+            'imageHeight' => 400,
             'favicon' => 'https://example.com/fav.ico',
             'language' => 'de-AT',
             'authorName' => 'Max Mustermann',
         ]];
         yield 'relative URLs against <base>' => ['relative-urls.html', 'https://example.com/p/page', null, [
-            'url' => 'https://static.example.com/canonical?x=1',
+            'canonicalUrl' => 'https://static.example.com/canonical?x=1',
             'title' => 'Relative',
             'image' => 'https://static.example.com/assets/img/a.png',
             'favicon' => 'https://cdn.example.com/i.ico',
@@ -123,7 +131,7 @@ final class PageCorpusTest
     {
         $result = $this->provider()->fromHtml(html: Fixtures::read('none.html'), pageUrl: 'https://example.com/');
 
-        Assert::same($result->error(), PreviewFailure::EmptyPage);
+        Assert::same($result->error()?->reason, PreviewFailureReason::EmptyPage);
     }
 
     public function externalEntityDoesNotLeakAFile(): void

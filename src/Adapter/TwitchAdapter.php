@@ -15,7 +15,7 @@ use Rasuvaeff\Result\Result;
  *
  * Needs nothing.
  *
- * @api
+ * @internal reached through {@see AdapterRegistry::standard()}
  */
 final readonly class TwitchAdapter implements Adapter
 {

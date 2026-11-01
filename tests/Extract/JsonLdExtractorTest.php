@@ -280,6 +280,45 @@ final class JsonLdExtractorTest
     /**
      * @return Result<Metadata, ExtractFailure>
      */
+
+    #[DataProvider('imageObjectProvider')]
+    public function readsTheSidesOfAnImageObject(string $image, ?string $url, ?int $width, ?int $height): void
+    {
+        $metadata = $this->extract($this->block('{"@context":"https://schema.org","@type":"Article","headline":"T","image":' . $image . '}'))->unwrap();
+
+        Assert::same([$metadata->image, $metadata->imageWidth, $metadata->imageHeight], [$url, $width, $height]);
+    }
+
+    public static function imageObjectProvider(): iterable
+    {
+        yield 'url string' => ['"https://e.example/i.png"', 'https://e.example/i.png', null, null];
+        yield 'image object' => ['{"@type":"ImageObject","url":"https://e.example/i.png","width":1200,"height":"630"}', 'https://e.example/i.png', 1200, 630];
+        yield 'content url' => ['{"@type":"ImageObject","contentUrl":"/i.png","width":{"@type":"QuantitativeValue","value":800}}', 'https://example.com/i.png', 800, null];
+        yield 'first usable of a list' => ['["javascript:x",{"url":"javascript:y","width":5},{"url":"https://e.example/b.png","width":300,"height":200}]', 'https://e.example/b.png', 300, 200];
+        yield 'object without a url' => ['[{"width":5},"https://e.example/c.png"]', 'https://e.example/c.png', null, null];
+        yield 'nothing usable' => ['[{"width":5},"data:x"]', null, null, null];
+        yield 'url before content url' => ['{"url":"https://e.example/u.png","contentUrl":"https://e.example/c.png","width":7}', 'https://e.example/u.png', 7, null];
+    }
+
+    public function anImageReferenceIsResolvedWithItsSides(): void
+    {
+        $graph = '{"@context":"https://schema.org","@graph":['
+            . '{"@type":"Article","headline":"T","image":{"@id":"https://e.example/#img"}},'
+            . '{"@type":"ImageObject","@id":"https://e.example/#img","url":"https://e.example/i.png","width":640,"height":360}]}';
+
+        $metadata = $this->extract($this->block($graph))->unwrap();
+
+        Assert::same([$metadata->image, $metadata->imageWidth, $metadata->imageHeight], ['https://e.example/i.png', 640, 360]);
+    }
+
+
+    public function theImageOutranksTheThumbnail(): void
+    {
+        $metadata = $this->extract($this->block('{"@context":"https://schema.org","@type":"VideoObject","name":"V","thumbnailUrl":"https://e.example/t.png","image":"https://e.example/i.png"}'))->unwrap();
+
+        Assert::same($metadata->image, 'https://e.example/i.png');
+    }
+
     private function extract(string $html): Result
     {
         return (new JsonLdExtractor())->extract(document: PageDocument::parse($html), pageUrl: self::PAGE);

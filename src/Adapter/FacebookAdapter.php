@@ -13,7 +13,7 @@ use Rasuvaeff\Result\Result;
  * and makes no request. The token is sent as a bearer header to
  * `graph.facebook.com` only, never in a URL.
  *
- * @api
+ * @internal reached through {@see AdapterRegistry::standard()}
  */
 final readonly class FacebookAdapter implements Adapter
 {

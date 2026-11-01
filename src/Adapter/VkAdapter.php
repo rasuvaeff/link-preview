@@ -13,7 +13,7 @@ use Rasuvaeff\Result\Result;
  * `https://vk.com/video_ext.php?oid=-123&id=456`. Needs nothing, but VK serves
  * rich pages to known crawlers only: set a `UserAgentMap` entry for `vk.com`.
  *
- * @api
+ * @internal reached through {@see AdapterRegistry::standard()}
  */
 final readonly class VkAdapter implements Adapter
 {
@@ -32,7 +32,7 @@ final readonly class VkAdapter implements Adapter
             return $page;
         }
 
-        return Result::ok(value: OEmbedSupport::with(new Metadata(siteName: 'VK', embedUrl: $this->embed($url)), $page->unwrap()));
+        return Result::ok(value: OEmbedSupport::with(new Metadata(siteName: 'VK', embedUrl: $this->embed($url), providerName: 'VK'), $page->unwrap()));
     }
 
     /**

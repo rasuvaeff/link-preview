@@ -133,18 +133,61 @@ final readonly class JsonLdExtractor implements Extractor
             }
         }
 
+        $image = $this->image($node['image'] ?? $node['thumbnailUrl'] ?? null, $byId, $urls);
+
         return new Metadata(
             url: $urls->first($this->strings($node['url'] ?? null, $byId, ['url', '@id']) ?: $this->strings($node['mainEntityOfPage'] ?? null, $byId, ['@id', 'url'])),
             title: Json::string($node['headline'] ?? null) ?? $name,
             description: Json::string($node['description'] ?? null),
-            image: $urls->first($this->strings($node['image'] ?? $node['thumbnailUrl'] ?? null, $byId, ['url', 'contentUrl'])),
+            image: $image[0] ?? null,
             siteName: $this->strings($node['publisher'] ?? null, $byId, ['name'])[0] ?? null,
             language: Values::language(Json::string($node['inLanguage'] ?? null)),
             authorName: Values::name($this->strings($node['author'] ?? null, $byId, ['name'])[0] ?? null),
             publishedTime: Values::time(Json::string($node['datePublished'] ?? $node['uploadDate'] ?? null)),
             type: $type,
             embedUrl: $urls->first($this->strings($node['embedUrl'] ?? null, $byId, ['url'])),
+            imageWidth: $image[1] ?? null,
+            imageHeight: $image[2] ?? null,
         );
+    }
+
+    /**
+     * The first usable image of a node - a URL, or an `ImageObject` (possibly an `@id`
+     * reference) with `url` / `contentUrl` - and the `width` / `height` of that object.
+     *
+     * @param array<string, array<string, mixed>> $byId
+     *
+     * @return array{non-empty-string, int<1, max>|null, int<1, max>|null}|null
+     */
+    private function image(mixed $value, array $byId, UrlContext $urls): ?array
+    {
+        foreach (Json::items($value) as $item) {
+            $object = Json::object($item);
+
+            if ($object === null) {
+                $resolved = $urls->resolve(Json::string($item));
+
+                if ($resolved !== null) {
+                    return [$resolved, null, null];
+                }
+
+                continue;
+            }
+
+            $reference = Json::string($object['@id'] ?? null);
+
+            if ($reference !== null && isset($byId[$reference]) && array_keys($object) === ['@id']) {
+                $object = $byId[$reference];
+            }
+
+            $resolved = $urls->resolve(Json::string($object['url'] ?? null) ?? Json::string($object['contentUrl'] ?? null));
+
+            if ($resolved !== null) {
+                return [$resolved, Values::dimension($object['width'] ?? null), Values::dimension($object['height'] ?? null)];
+            }
+        }
+
+        return null;
     }
 
     /**

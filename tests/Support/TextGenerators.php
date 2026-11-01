@@ -29,4 +29,43 @@ final readonly class TextGenerators
             'limit' => Gen::intBetween(1, 40),
         ];
     }
+
+    /**
+     * Text the way pages write it: words, whitespace and control characters, entities
+     * (double-escaped ones too), tags, and the loose `<`, `>`, `&`, `;` and letters that
+     * glue into new tags and entities. One draw in ten is escaped so deep that only the
+     * full-width fallback can finish it.
+     *
+     * @return array<string, ArbitraryInterface>
+     */
+    public static function markup(): array
+    {
+        return ['text' => self::markupText()];
+    }
+
+    /**
+     * @return array<string, ArbitraryInterface>
+     */
+    public static function clippedMarkup(): array
+    {
+        return ['text' => self::markupText(), 'limit' => Gen::intBetween(1, 40)];
+    }
+
+    public static function markupText(): ArbitraryInterface
+    {
+        return Gen::frequency([
+            [9, Gen::map(Gen::arrayOf(Gen::elements(self::TOKENS), 0, 40), static fn(array $tokens): string => implode('', $tokens))],
+            [1, Gen::map(
+                Gen::intBetween(3, 8),
+                static fn(int $depth): string => '&' . str_repeat('amp;', $depth) . 'lt;b&' . str_repeat('amp;', $depth) . 'gt; x',
+            )],
+        ]);
+    }
+
+    private const array TOKENS = [
+        'a', 'b', 'p', 'é', '中', '😀', ' ', '  ', "\t", "\n", "\u{00A0}", "\u{0007}", "\u{0000}",
+        '&amp;', '&lt;', '&gt;', '&quot;', '&#39;', '&#60;', '&#x3E;', '&nbsp;', '&amp;amp;', '&amp;lt;', '&amp;quot;', '&foo;', '&#0;',
+        '<b>', '</b>', '<br/>', '<p class="x">', '<!-- c -->', '<!DOCTYPE html>', '<?php ?>',
+        '<', '>', '&', ';', 'amp', 'lt', 'gt', '#', '/', '=', '"', '!', '?', '<3', 'a < b',
+    ];
 }

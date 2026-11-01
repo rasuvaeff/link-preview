@@ -94,12 +94,13 @@ final class TwitterAdapterTest
     public static function htmlProvider(): iterable
     {
         yield 'plain' => ['<blockquote><p>Hello</p></blockquote>', 'Hello'];
-        yield 'entities and quotes' => ['<blockquote><p>a &lt;b&gt; &quot;c&quot; &#39;d&#39;</p></blockquote>', 'a <b> "c" \'d\''];
+        yield 'entities and quotes' => ['<blockquote><p>a &lt;3 &quot;c&quot; &#39;d&#39;</p></blockquote>', 'a <3 "c" \'d\''];
+        yield 'escaped markup is markup' => ['<blockquote><p>a &lt;b&gt;bold&lt;/b&gt;</p></blockquote>', 'a bold'];
         yield 'link inside' => ['<blockquote><p>see <a href="https://t.co/x">t.co/x</a></p></blockquote>', 'see t.co/x'];
         yield 'line breaks' => ['<blockquote><p>one<br>two<br/>three</p></blockquote>', 'one two three'];
         yield 'first paragraph only' => ['<blockquote><p>first</p><p>second</p></blockquote>', 'first'];
         yield 'paragraph with attributes' => ['<blockquote><p lang="en" dir="ltr">text</p></blockquote>', 'text'];
-        yield 'multiline' => ["<blockquote><p>a\nb</p></blockquote>", "a\nb"];
+        yield 'multiline' => ["<blockquote><p>a\nb</p></blockquote>", 'a b'];
         yield 'empty paragraph' => ['<blockquote><p> </p></blockquote>', null];
         yield 'no paragraph' => ['<blockquote>none</blockquote>', null];
     }

@@ -131,6 +131,20 @@ final readonly class UrlPolicy
     }
 
     /**
+     * Whether a resolved address may be connected to: the same ranges and the same
+     * `allowedNetworks` as {@see self::check()} on a URL with that IP literal. Anything
+     * that is not a plain IPv4 or IPv6 address (no brackets, no port) is refused.
+     *
+     * This is the `AddressPolicy` of a pinning client such as `rasuvaeff/pinned-http-client`.
+     */
+    public function allowsAddress(string $address): bool
+    {
+        $packed = filter_var($address, FILTER_VALIDATE_IP) === false ? false : inet_pton($address);
+
+        return $packed !== false && !$this->isBlocked($address, $packed);
+    }
+
+    /**
      * @return UrlRejection|array{non-empty-string, string|null} the URL authority and the packed
      *         address when the host is an IP literal
      */

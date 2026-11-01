@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Rasuvaeff\LinkPreview\Fetch;
 
 /**
+ * A fetched body - an HTML page, a JSON answer or a media file - and where it came from.
+ *
  * @api
  */
 final readonly class FetchedPage

@@ -15,7 +15,7 @@ use Rasuvaeff\Result\Result;
  * only; it is not part of any URL, so it cannot leak into a log of requests or
  * into a redirect.
  *
- * @api
+ * @internal reached through {@see AdapterRegistry::standard()}
  */
 final readonly class InstagramAdapter implements Adapter
 {

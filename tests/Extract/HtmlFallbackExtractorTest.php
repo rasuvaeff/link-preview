@@ -106,6 +106,33 @@ final class HtmlFallbackExtractorTest
     /**
      * @return \Rasuvaeff\Result\Result<\Rasuvaeff\LinkPreview\Extract\Metadata, ExtractFailure>
      */
+
+    public function theImageKeepsItsDeclaredSides(): void
+    {
+        $metadata = $this->extract('<img src="/small.png" width="10"><img src="/a.png" width="640" height="480"><img src="/b.png" width="900" height="900">')->unwrap();
+
+        Assert::same([$metadata->image, $metadata->imageWidth, $metadata->imageHeight], ['https://example.com/a.png', 640, 480]);
+    }
+
+    public function anImageWithoutSidesHasNone(): void
+    {
+        $metadata = $this->extract('<img src="/a.png">')->unwrap();
+
+        Assert::null($metadata->imageWidth);
+        Assert::null($metadata->imageHeight);
+        Assert::null($this->extract('<title>T</title>')->unwrap()->imageWidth);
+    }
+
+
+    public function everyIconCandidateIsTriedInOrder(): void
+    {
+        $icon = $this->extract('<link rel="icon" href="javascript:a"><link rel="icon" href="/i.ico"><link rel="apple-touch-icon" href="/t.png">')->unwrap();
+        $touch = $this->extract('<link rel="apple-touch-icon" href="javascript:a"><link rel="apple-touch-icon" href="/t.png">')->unwrap();
+
+        Assert::same($icon->favicon, 'https://example.com/i.ico');
+        Assert::same($touch->favicon, 'https://example.com/t.png');
+    }
+
     private function extract(string $html): \Rasuvaeff\Result\Result
     {
         return (new HtmlFallbackExtractor())->extract(document: PageDocument::parse($html), pageUrl: self::PAGE);

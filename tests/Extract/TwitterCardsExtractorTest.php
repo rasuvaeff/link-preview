@@ -59,6 +59,32 @@ final class TwitterCardsExtractorTest
     /**
      * @return \Rasuvaeff\Result\Result<\Rasuvaeff\LinkPreview\Extract\Metadata, ExtractFailure>
      */
+
+    public function readsTheImageDimensions(): void
+    {
+        $metadata = $this->extract('<meta name="twitter:image" content="/i.png"><meta name="twitter:image:width" content="800"><meta name="twitter:image:height" content="418">')->unwrap();
+
+        Assert::same([$metadata->imageWidth, $metadata->imageHeight], [800, 418]);
+    }
+
+    public function dimensionsWithoutAnImageAreDropped(): void
+    {
+        $metadata = $this->extract('<meta name="twitter:title" content="T"><meta name="twitter:image:width" content="800"><meta name="twitter:image:height" content="418">')->unwrap();
+
+        Assert::null($metadata->imageWidth);
+        Assert::null($metadata->imageHeight);
+    }
+
+
+    public function everyImageCandidateIsTriedInOrder(): void
+    {
+        $image = $this->extract('<meta name="twitter:image" content="javascript:a"><meta name="twitter:image" content="/a.png"><meta name="twitter:image:src" content="/src.png">')->unwrap();
+        $src = $this->extract('<meta name="twitter:image:src" content="javascript:a"><meta name="twitter:image:src" content="/src.png">')->unwrap();
+
+        Assert::same($image->image, 'https://example.com/a.png');
+        Assert::same($src->image, 'https://example.com/src.png');
+    }
+
     private function extract(string $html): \Rasuvaeff\Result\Result
     {
         return (new TwitterCardsExtractor())->extract(document: PageDocument::parse($html), pageUrl: self::PAGE);

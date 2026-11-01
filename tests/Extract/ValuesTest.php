@@ -79,4 +79,39 @@ final class ValuesTest
         yield 'name with a colon' => ['Doe: Jane', 'Doe: Jane'];
         yield 'handle' => ['@jane', '@jane'];
     }
+
+    #[DataProvider('dimensionProvider')]
+    public function readsImageSides(mixed $value, ?int $expected): void
+    {
+        Assert::same(Values::dimension($value), $expected);
+    }
+
+    public static function dimensionProvider(): iterable
+    {
+        yield 'null' => [null, null];
+        yield 'int' => [1200, 1200];
+        yield 'one' => [1, 1];
+        yield 'zero' => [0, null];
+        yield 'negative' => [-5, null];
+        yield 'largest' => [99_999, 99_999];
+        yield 'too large' => [100_000, null];
+        yield 'integral float' => [480.0, 480];
+        yield 'float one' => [1.0, 1];
+        yield 'float below one' => [0.5, null];
+        yield 'fractional float' => [480.5, null];
+        yield 'zero float' => [0.0, null];
+        yield 'huge float' => [1e9, null];
+        yield 'digits' => ['630', 630];
+        yield 'pixels' => ['630px', 630];
+        yield 'padded' => [' 630 ', 630];
+        yield 'zero string' => ['0', null];
+        yield 'percent' => ['100%', null];
+        yield 'trailing newline' => ["630\n", 630];
+        yield 'words' => ['wide', null];
+        yield 'quantitative value' => [['@type' => 'QuantitativeValue', 'value' => 1200], 1200];
+        yield 'quantitative value as text' => [['value' => '1200'], 1200];
+        yield 'nested value' => [['value' => ['value' => 1]], null];
+        yield 'object without value' => [['unitCode' => 'E37'], null];
+        yield 'bool' => [true, null];
+    }
 }

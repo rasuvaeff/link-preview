@@ -5,38 +5,40 @@ declare(strict_types=1);
 namespace Rasuvaeff\LinkPreview;
 
 use Rasuvaeff\LinkPreview\Fetch\FetchFailure;
+use Rasuvaeff\LinkPreview\Fetch\Transience;
 
 /**
- * Why {@see PreviewProvider} produced no preview.
+ * Why {@see LinkPreviewer} produced no preview: the reason, and for
+ * {@see PreviewFailureReason::HttpStatus} the status and `Retry-After` of the answer.
+ *
+ * {@see self::isTransient()} tells a failure worth retrying (the network, a spent
+ * budget, HTTP 408, 425, 429 and 5xx) from one that will repeat (everything else).
  *
  * @api
  */
-enum PreviewFailure: string
+final readonly class PreviewFailure
 {
-    case PolicyRejected = 'policy_rejected';
-    case Network = 'network';
-    case TooManyRedirects = 'too_many_redirects';
-    case InvalidRedirect = 'invalid_redirect';
-    case BudgetExceeded = 'budget_exceeded';
-    case HttpStatus = 'http_status';
-    case NotHtml = 'not_html';
-    case TooLarge = 'too_large';
-    /** the site's adapter needs an access token that was not configured, and the page itself was unavailable */
-    case MissingToken = 'missing_token';
-    /** the page was fetched but no extractor found anything in it */
-    case EmptyPage = 'empty_page';
+    /**
+     * @param int<100, 599>|null $status the HTTP status, for {@see PreviewFailureReason::HttpStatus}
+     * @param int<0, max>|null $retryAfterSeconds the server's `Retry-After`, when it sent a readable one
+     */
+    public function __construct(
+        public PreviewFailureReason $reason,
+        public ?int $status = null,
+        public ?int $retryAfterSeconds = null,
+    ) {}
 
     public static function fromFetch(FetchFailure $failure): self
     {
-        return match ($failure) {
-            FetchFailure::PolicyRejected => self::PolicyRejected,
-            FetchFailure::Network => self::Network,
-            FetchFailure::TooManyRedirects => self::TooManyRedirects,
-            FetchFailure::InvalidRedirect => self::InvalidRedirect,
-            FetchFailure::BudgetExceeded => self::BudgetExceeded,
-            FetchFailure::HttpStatus => self::HttpStatus,
-            FetchFailure::NotHtml => self::NotHtml,
-            FetchFailure::TooLarge => self::TooLarge,
-        };
+        return new self(
+            reason: PreviewFailureReason::fromFetch($failure->reason),
+            status: $failure->status,
+            retryAfterSeconds: $failure->retryAfterSeconds,
+        );
+    }
+
+    public function isTransient(): bool
+    {
+        return Transience::of(reason: $this->reason->value, status: $this->status);
     }
 }

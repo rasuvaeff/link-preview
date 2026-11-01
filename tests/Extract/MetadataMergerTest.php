@@ -111,4 +111,42 @@ final class MetadataMergerTest
             Assert::false($metadata->isEmpty());
         }
     }
+
+    public function theImageAndItsDimensionsAreOneField(): void
+    {
+        $merged = MetadataMerger::merge([
+            new Metadata(title: 'no image', imageWidth: 1, imageHeight: 2),
+            new Metadata(image: 'https://a.example/a.png'),
+            new Metadata(image: 'https://b.example/b.png', imageWidth: 800, imageHeight: 600),
+        ]);
+
+        Assert::same($merged->image, 'https://a.example/a.png');
+        Assert::null($merged->imageWidth);
+        Assert::null($merged->imageHeight);
+
+        $second = MetadataMerger::merge([new Metadata(title: 'x'), new Metadata(image: 'https://b.example/b.png', imageWidth: 800, imageHeight: 600)]);
+
+        Assert::same([$second->image, $second->imageWidth, $second->imageHeight], ['https://b.example/b.png', 800, 600]);
+    }
+
+    public function textIsCleanedOnTheWayInSoMarkupOnlyFallsThrough(): void
+    {
+        $merged = MetadataMerger::merge([
+            new Metadata(title: '<b></b>', description: '&nbsp;', siteName: '<br>', authorName: '<i> </i>', providerName: '&lt;p&gt;'),
+            new Metadata(title: 'T &amp; U', description: 'D', siteName: 'S', authorName: 'A', providerName: 'P'),
+        ]);
+
+        Assert::same($merged->title, 'T & U');
+        Assert::same($merged->description, 'D');
+        Assert::same($merged->siteName, 'S');
+        Assert::same($merged->authorName, 'A');
+        Assert::same($merged->providerName, 'P');
+    }
+
+    public function theProviderOfTheFirstSourceWins(): void
+    {
+        Assert::same(MetadataMerger::merge([new Metadata(providerName: 'A'), new Metadata(providerName: 'B')])->providerName, 'A');
+        Assert::false((new Metadata(providerName: 'A'))->isEmpty());
+        Assert::false((new Metadata(embedUrl: 'https://a.example/e'))->isEmpty());
+    }
 }

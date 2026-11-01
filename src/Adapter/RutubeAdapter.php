@@ -14,7 +14,7 @@ use Rasuvaeff\Result\Result;
  * Rutube videos (`rutube.ru/video/<32 hex>/`) through the video API
  * (`/api/video/<id>/?format=json`). Needs nothing.
  *
- * @api
+ * @internal reached through {@see AdapterRegistry::standard()}
  */
 final readonly class RutubeAdapter implements Adapter
 {
@@ -57,6 +57,7 @@ final readonly class RutubeAdapter implements Adapter
             publishedTime: Values::time(Json::string($data['created'] ?? $data['publication_ts'] ?? null)),
             type: 'video',
             embedUrl: OEmbedSupport::absolute(Json::string($data['embed_url'] ?? null) ?? ''),
+            providerName: 'Rutube',
         ));
     }
 }
