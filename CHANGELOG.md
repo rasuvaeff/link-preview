@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Requires `rasuvaeff/json-ld` ^0.2 (`ProcessingOptions`; loader failures arrive as
+  `DocumentLoadingException`). No change in what is read.
+
 The pre-1.0 contract: what 1.0 will freeze. Breaking changes are marked **BC:**.
 
 - **BC:** failures are value objects. `PreviewProvider::preview()` / `fromHtml()` return `Result<PageInfo, PreviewFailure>` where `PreviewFailure` is now a class with `reason` (the new enum `PreviewFailureReason`), `status` (the HTTP status of an `HttpStatus` failure), `retryAfterSeconds` (the server's `Retry-After`: delta-seconds, or an HTTP-date counted from the response's `Date`; capped at a day) and `isTransient()` (network, spent budget, HTTP 408/425/429/5xx). The `Fetcher` does the same with `FetchFailure` / `FetchFailureReason`. Migration: `$result->error() === PreviewFailure::Network` becomes `$result->error()?->reason === PreviewFailureReason::Network` (the old form now fails loudly: the constants are gone); `->error()?->value` becomes `->error()?->reason->value`; retry only when `isTransient()`.

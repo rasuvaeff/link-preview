@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace Rasuvaeff\LinkPreview\Extract;
 
 use Rasuvaeff\JsonLd\Exception\JsonLdException;
-use Rasuvaeff\JsonLd\ExpandOptions;
 use Rasuvaeff\JsonLd\JsonLd;
+use Rasuvaeff\JsonLd\ProcessingOptions;
 use Rasuvaeff\Result\Result;
-use RuntimeException;
 
 /**
  * Reads `<script type="application/ld+json">` with the JSON-LD 1.1 processor of `rasuvaeff/json-ld`: the block is
@@ -26,11 +25,11 @@ final readonly class ProcessorJsonLdReader implements JsonLdReader
 {
     private const array VOCABULARIES = ['https://schema.org/', 'http://schema.org/'];
 
-    private ExpandOptions $options;
+    private ProcessingOptions $options;
 
     public function __construct()
     {
-        $this->options = new ExpandOptions(loader: new SchemaOrgContextLoader());
+        $this->options = new ProcessingOptions(loader: new SchemaOrgContextLoader());
     }
 
     #[\Override]
@@ -45,7 +44,8 @@ final readonly class ProcessorJsonLdReader implements JsonLdReader
 
         try {
             $expanded = JsonLd::expand($data, $this->options);
-        } catch (JsonLdException|RuntimeException) {
+        } catch (JsonLdException) {
+            // json-ld 0.2 reports every loader failure as a JsonLdException (DocumentLoadingException)
             return Result::err(error: JsonLdFailure::UnsupportedContext);
         }
 
