@@ -3,11 +3,12 @@ name: rasuvaeff-link-preview
 description: >-
   Link previews for PHP with rasuvaeff/link-preview - PreviewProvider facade,
   Fetcher (PSR-18 with its own redirect loop), UrlPolicy (SSRF whitelist),
-  PageInfo, Limits, UserAgentMap, PageDocument, the oEmbed, JSON-LD,
-  OpenGraph, Twitter Cards and HTML-fallback extractors and eleven site
-  adapters (YouTube, TikTok, Twitter/X, Twitch, Wikipedia, GitHub,
-  Instagram, Facebook, Telegram, VK, Rutube), all returning Result with enum
-  failures. Use when writing, reviewing or debugging code that fetches a
+  PageInfo, Limits (clean text), UserAgentMap, PageDocument, the oEmbed,
+  JSON-LD, OpenGraph, Twitter Cards and HTML-fallback extractors and eleven
+  site adapters (YouTube, TikTok, Twitter/X, Twitch, Wikipedia, GitHub,
+  Instagram, Facebook, Telegram, VK, Rutube) behind AdapterRegistry, the
+  LinkPreviewer interface, all returning Result with failure value objects
+  (reason, HTTP status, Retry-After, isTransient). Use when writing, reviewing or debugging code that fetches a
   user-supplied URL and extracts title/description/image metadata in a
   project that has this package installed.
 ---
@@ -33,9 +34,11 @@ Cards and plain-HTML metadata. Namespace `Rasuvaeff\LinkPreview\`.
 3. **No DNS pinning in pure PSR-18.** `UrlPolicy` never resolves names, so a
    name pointing at an internal address passes and rebinding is possible.
    Mitigate in the transport: `rasuvaeff/pinned-http-client` as the Fetcher's
-   PSR-18 client (resolves, checks every address, pins the connection; see
-   `examples/with_pinned_client.php`), or a trusted resolving egress proxy that
-   refuses internal destinations. Say so in reviews; do not claim this package
+   PSR-18 client with `UrlPolicy::allowsAddress()` as its `AddressPolicy`
+   (resolves, checks every address, pins the connection; see
+   `examples/with_pinned_client.php`) - never wrapped in its
+   `RedirectFollower` - or a trusted resolving egress proxy that refuses
+   internal destinations. Say so in reviews; do not claim this package
    prevents it on its own.
 
 4. **Bound everything.** `maxBodyBytes`, `maxRedirects`, `chainBudgetSeconds`
@@ -48,9 +51,11 @@ Cards and plain-HTML metadata. Namespace `Rasuvaeff\LinkPreview\`.
    are dropped. `allowedNetworks` (private ranges) is for development stands
    only; never enable it for user-supplied URLs in production.
 
-6. **Page text is foreign input.** Title, description and names are plain text
-   from a stranger: escape them for the output context (HTML, JSON, Markdown),
-   never render as markup.
+6. **Page text is foreign input.** Title, description and names come out as
+   clean plain text (entities decoded, tags removed), but they are still a
+   stranger's words: escape them for the output context (HTML, JSON,
+   Markdown), never render as markup. Link the card to `PageInfo::$url` (the
+   fetched URL), not to `canonicalUrl` (what the page claims, any host).
 
 7. **Adapters are matched by host labels, never by substring** (`str_contains`
    would take `youtube.com.evil.example` for YouTube). A new adapter returns
@@ -74,19 +79,31 @@ Cards and plain-HTML metadata. Namespace `Rasuvaeff\LinkPreview\`.
 ## Canonical usage
 
 ```php
-use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\HttpFactory;
 use Rasuvaeff\LinkPreview\Fetch\Fetcher;
 use Rasuvaeff\LinkPreview\Fetch\UrlPolicy;
 use Rasuvaeff\LinkPreview\Fetch\UserAgentMap;
 use Rasuvaeff\LinkPreview\Limits;
+use Rasuvaeff\LinkPreview\LinkPreviewer;
 use Rasuvaeff\LinkPreview\PreviewProvider;
+use Rasuvaeff\PinnedHttpClient\AddressPolicy;
+use Rasuvaeff\PinnedHttpClient\PinnedClient;
 
-$provider = new PreviewProvider(
+$policy = new UrlPolicy();
+
+$provider = new PreviewProvider(   // type-hint consumers against LinkPreviewer
     fetcher: new Fetcher(
-        client: new Client(['allow_redirects' => false, 'http_errors' => false, 'timeout' => 5.0]),
+        client: new PinnedClient(
+            policy: new class ($policy) implements AddressPolicy {
+                public function __construct(private UrlPolicy $policy) {}
+                public function allows(string $address): bool { return $this->policy->allowsAddress($address); }
+            },
+            timeoutSeconds: 5.0,
+            connectTimeoutSeconds: 3.0,
+            maxBodyBytes: 2_097_153,
+        ),
         requestFactory: new HttpFactory(),
-        policy: new UrlPolicy(),
+        policy: $policy,
         userAgents: UserAgentMap::unfurler(['t.me' => 'TelegramBot (like TwitterBot)']),
         maxRedirects: 5,
         maxBodyBytes: 2_097_152,
@@ -98,23 +115,29 @@ $provider = new PreviewProvider(
 $result = $provider->preview(url: $userUrl);   // Result<PageInfo, PreviewFailure>
 
 if ($result->isErr()) {
-    // PolicyRejected, Network, TooManyRedirects, InvalidRedirect,
-    // BudgetExceeded, HttpStatus, NotHtml, TooLarge, EmptyPage
+    $failure = $result->error();               // reason, status, retryAfterSeconds
+    // retry only $failure->isTransient() (network, budget, 408/425/429/5xx), after retryAfterSeconds if set
     return;
 }
 
-$info = $result->unwrap();   // url, title, description, image, favicon, siteName,
-                             // language, authorName, publishedTime, type
+$info = $result->unwrap();   // url (fetched), canonicalUrl (claimed), title, description, image,
+                             // imageWidth, imageHeight, favicon, siteName, providerName,
+                             // language, authorName, publishedTime, type, embedUrl
+$stored = $info->toArray();  // PageInfo::fromArray($stored) reads it back
 ```
 
-No network (tests, stored HTML): `$provider->fromHtml(html: $html, pageUrl: $url, charset: 'windows-1251')`.
+No network for the page (tests, stored HTML): `$provider->fromHtml(html: $html, pageUrl: $url, charset: 'windows-1251')`;
+a `pageUrl` the policy refuses is `PolicyRejected`. Images: `$fetcher->fetchMedia(url: $info->image, acceptedTypes: ['image/*'], maxBytes: ...)`.
 
 ## Pitfalls
 
-- JSON answers are parsed through `Extract\Schemas` (`rasuvaeff/schema`); a wrong-typed field
-  makes the answer unreadable (`InvalidResponse`), the reason (`$.title: ...`, no values) is in
-  `AdapterContext::diagnostics()`. Extend the schema, don't add `isset` chains; in tests use
-  `Schemas::oEmbed()->arbitrary()` for generated answers.
+- JSON answers are shape-checked internally (`rasuvaeff/schema` is an implementation detail, not
+  API); a wrong-typed field makes the answer unreadable (`InvalidResponse`), the reason
+  (`$.title: ...`, no values) is in `AdapterContext::diagnostics()`.
+- Built-in adapters are internal classes: get them from `AdapterRegistry::standard(...)` and put
+  custom `Adapter`s in front with `->with(...)` (first matching domain wins).
+- Failures are value objects, not enums: compare `$result->error()?->reason` with
+  `PreviewFailureReason::...` (`FetchFailureReason::...` for the Fetcher).
 
 - Fields merge per field by priority: site adapter > oEmbed (discovery makes
   an extra request) > JSON-LD > OpenGraph > Twitter Cards > HTML. A custom
@@ -122,9 +145,12 @@ No network (tests, stored HTML): `$provider->fromHtml(html: $html, pageUrl: $url
   `new AdapterRegistry()` turns adapters off.
 - A failed adapter does not fail the preview; the generic extractors still
   run. VK answers the default name with a redirect loop and championat.com with a login stub: use `UserAgentMap::unfurler()` (`Twitterbot/1.0`) when reading arbitrary sites.
-- `Limits` drops an over-long or (with `httpsImagesOnly`) plain-http image
-  after the merge; the next source is not consulted.
-- `PageInfo::$url` is `og:url`, else `canonical`, else the final fetched URL.
+- `Limits` cleans text before clipping (entities decoded repeatedly, tags removed); do not
+  decode or strip again. It drops an over-long or (with `httpsImagesOnly`) plain-http image
+  with its dimensions after the merge; the next source is not consulted.
+- `PageInfo::$url` is the final fetched URL; `canonicalUrl` is `og:url` / canonical / JSON-LD
+  `url` / adapter - foreign-controlled. `siteName` falls back to the host only with
+  `hostAsSiteName: true`.
 - `UrlPolicy::check()` returns the normalised URL (ASCII host, no fragment,
   default port removed); fetch that, not the raw input.
 - Integer/hex/octal IP spellings give `NonCanonicalIp`, IPv6-embedded IPv4

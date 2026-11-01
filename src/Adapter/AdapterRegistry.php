@@ -7,6 +7,10 @@ namespace Rasuvaeff\LinkPreview\Adapter;
 /**
  * Host -> adapter. The first adapter whose domains match the host wins.
  *
+ * The built-in adapters are not public classes: take them from
+ * {@see self::standard()} and put your own in front with {@see self::with()} -
+ * an adapter of yours for `youtube.com` then replaces the built-in one.
+ *
  * @api
  */
 final readonly class AdapterRegistry
@@ -45,6 +49,14 @@ final readonly class AdapterRegistry
             new VkAdapter(),
             new RutubeAdapter(),
         ]);
+    }
+
+    /**
+     * A registry that asks `$adapters` first, in the order given, and this one's after them.
+     */
+    public function with(Adapter ...$adapters): self
+    {
+        return new self([...array_values($adapters), ...$this->adapters]);
     }
 
     public function find(string $host): ?Adapter

@@ -22,7 +22,7 @@ use Rasuvaeff\Schema\Unknown;
  * `url` and `video`/`rich` for `html`, but real endpoints deviate, and an answer that lacks a
  * field the spec wants is still worth reading.
  *
- * @api
+ * @internal `rasuvaeff/schema` is an implementation detail, not part of the contract
  */
 final readonly class Schemas
 {
@@ -41,6 +41,10 @@ final readonly class Schemas
             'thumbnail_url' => self::text(),
             'url' => self::text(),
             'html' => self::text(),
+            'thumbnail_width' => self::dimension(),
+            'thumbnail_height' => self::dimension(),
+            'width' => self::dimension(),
+            'height' => self::dimension(),
         ], unknown: Unknown::Passthrough);
     }
 
@@ -118,6 +122,15 @@ final readonly class Schemas
         $result = Result::err(error: $diagnostic);
 
         return $result;
+    }
+
+    /**
+     * A side in pixels as services actually send it: a number, a numeric string, or
+     * something else (`"100%"`) that is read as unknown rather than spoiling the answer.
+     */
+    private static function dimension(): SchemaInterface
+    {
+        return Schema::union([Schema::int(), Schema::float(), Schema::string()])->nullable()->optional();
     }
 
     private static function text(): SchemaInterface

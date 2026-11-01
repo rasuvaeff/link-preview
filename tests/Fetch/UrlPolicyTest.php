@@ -279,4 +279,60 @@ final class UrlPolicyTest
         Assert::same($policy->check(url: (string) $once->value())->value(), $once->value());
         Assert::false(str_contains((string) $once->value(), '#'));
     }
+
+    #[DataProvider('addressProvider')]
+    public function judgesResolvedAddresses(string $address, bool $allowed): void
+    {
+        Assert::same((new UrlPolicy())->allowsAddress($address), $allowed);
+    }
+
+    public static function addressProvider(): iterable
+    {
+        yield 'public v4' => ['93.184.216.34', true];
+        yield 'public v6' => ['2606:2800:220:1:248:1893:25c8:1946', true];
+        yield 'loopback' => ['127.0.0.1', false];
+        yield 'metadata' => ['169.254.169.254', false];
+        yield 'private' => ['10.1.2.3', false];
+        yield 'v6 loopback' => ['::1', false];
+        yield 'mapped private' => ['::ffff:10.0.0.1', false];
+        yield 'nat64 loopback' => ['64:ff9b::7f00:1', false];
+        yield 'unique local' => ['fd00::1', false];
+        yield 'bracketed' => ['[2606:2800:220:1:248:1893:25c8:1946]', false];
+        yield 'a name' => ['example.com', false];
+        yield 'localhost' => ['localhost', false];
+        yield 'octal' => ['0177.0.0.1', false];
+        yield 'integer' => ['2130706433', false];
+        yield 'with a port' => ['93.184.216.34:80', false];
+        yield 'zone' => ['fe80::1%eth0', false];
+        yield 'empty' => ['', false];
+        yield 'trailing newline' => ["93.184.216.34\n", false];
+    }
+
+    public function theAllowlistOpensAddressesToo(): void
+    {
+        $policy = new UrlPolicy(allowedNetworks: ['10.20.0.0/16', '::1']);
+
+        Assert::true($policy->allowsAddress('10.20.1.1'));
+        Assert::false($policy->allowsAddress('10.21.1.1'));
+        Assert::true($policy->allowsAddress('::1'));
+    }
+
+    /**
+     * An address passes exactly when a URL with that address as its host would.
+     */
+    #[Property(runs: 400, generators: [UrlGenerators::class, 'address'], timeoutMs: 250)]
+    public function addressVerdictMatchesTheUrlVerdict(int $a, int $b, int $c, int $d): void
+    {
+        $address = $a . '.' . $b . '.' . $c . '.' . $d;
+        $mapped = '::ffff:' . $address;
+        $policy = new UrlPolicy();
+        $allowed = $policy->allowsAddress($address);
+
+        Assert::same($allowed, $policy->check(url: 'https://' . $address . '/')->isOk());
+        Assert::same($policy->allowsAddress($mapped), $policy->check(url: 'https://[' . $mapped . ']/')->isOk());
+        Assert::same($allowed, !UrlGenerators::isBlockedIpv4($a, $b, $c, $d));
+
+        Classify::cover(condition: $allowed, label: 'allowed', minPercent: 10.0);
+        Classify::cover(condition: !$allowed, label: 'refused', minPercent: 10.0);
+    }
 }

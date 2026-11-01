@@ -14,7 +14,7 @@ use Rasuvaeff\Result\Result;
  * serves its OpenGraph tags to link-preview crawlers only: give the `Fetcher` a
  * `UserAgentMap` entry for `t.me` such as `TelegramBot (like TwitterBot)`.
  *
- * @api
+ * @internal reached through {@see AdapterRegistry::standard()}
  */
 final readonly class TelegramAdapter implements Adapter
 {
@@ -38,6 +38,6 @@ final readonly class TelegramAdapter implements Adapter
             ? 'https://t.me/' . $m[1] . '/' . $m[2] . '?embed=1&mode=tme'
             : null;
 
-        return Result::ok(value: OEmbedSupport::with(new Metadata(siteName: 'Telegram', embedUrl: $embed), $page->unwrap()));
+        return Result::ok(value: OEmbedSupport::with(new Metadata(siteName: 'Telegram', embedUrl: $embed, providerName: 'Telegram'), $page->unwrap()));
     }
 }

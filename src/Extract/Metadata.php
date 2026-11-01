@@ -7,8 +7,11 @@ namespace Rasuvaeff\LinkPreview\Extract;
 use DateTimeImmutable;
 
 /**
- * What one source — OpenGraph, Twitter Cards, plain HTML — knows about a page.
- * Every field may be missing. URLs are absolute http(s).
+ * What one source — OpenGraph, Twitter Cards, plain HTML, a site adapter — knows
+ * about a page. Every field may be missing. URLs are absolute http(s); `url` is
+ * the address the source claims for the page (it becomes
+ * {@see \Rasuvaeff\LinkPreview\PageInfo::$canonicalUrl}). The image dimensions
+ * describe this source's `image` and are merged together with it.
  *
  * @api
  */
@@ -19,6 +22,8 @@ final readonly class Metadata
      * @param non-empty-string|null $image
      * @param non-empty-string|null $favicon
      * @param non-empty-string|null $embedUrl absolute http(s) URL of an embeddable player
+     * @param int<1, max>|null $imageWidth
+     * @param int<1, max>|null $imageHeight
      */
     public function __construct(
         public ?string $url = null,
@@ -32,6 +37,9 @@ final readonly class Metadata
         public ?DateTimeImmutable $publishedTime = null,
         public ?string $type = null,
         public ?string $embedUrl = null,
+        public ?int $imageWidth = null,
+        public ?int $imageHeight = null,
+        public ?string $providerName = null,
     ) {}
 
     public function isEmpty(): bool
@@ -46,6 +54,7 @@ final readonly class Metadata
             && $this->authorName === null
             && !$this->publishedTime instanceof \DateTimeImmutable
             && $this->type === null
-            && $this->embedUrl === null;
+            && $this->embedUrl === null
+            && $this->providerName === null;
     }
 }

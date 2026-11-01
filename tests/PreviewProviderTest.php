@@ -11,9 +11,13 @@ use Rasuvaeff\LinkPreview\Adapter\AdapterRegistry;
 use Rasuvaeff\LinkPreview\Extract\TwitterCardsExtractor;
 use Rasuvaeff\LinkPreview\Fetch\Fetcher;
 use Rasuvaeff\LinkPreview\Fetch\FetchFailure;
+use Rasuvaeff\LinkPreview\Fetch\FetchFailureReason;
+use Rasuvaeff\LinkPreview\Fetch\Transience;
 use Rasuvaeff\LinkPreview\Limits;
+use Rasuvaeff\LinkPreview\LinkPreviewer;
 use Rasuvaeff\LinkPreview\PageInfo;
 use Rasuvaeff\LinkPreview\PreviewFailure;
+use Rasuvaeff\LinkPreview\PreviewFailureReason;
 use Rasuvaeff\LinkPreview\PreviewProvider;
 use Rasuvaeff\LinkPreview\Tests\Support\Adapters;
 use Rasuvaeff\LinkPreview\Tests\Support\Fixtures;
@@ -26,6 +30,8 @@ use Testo\Test;
 #[Test]
 #[Covers(PreviewProvider::class)]
 #[Covers(PreviewFailure::class)]
+#[Covers(PreviewFailureReason::class)]
+#[Covers(Transience::class)]
 final class PreviewProviderTest
 {
     public function previewsAFetchedPage(): void
@@ -34,7 +40,8 @@ final class PreviewProviderTest
 
         $info = $this->provider($client)->preview(url: 'https://example.com/news/a')->unwrap();
 
-        Assert::same($info->url, 'https://example.com/articles/42');
+        Assert::same($info->url, 'https://example.com/news/a');
+        Assert::same($info->canonicalUrl, 'https://example.com/articles/42');
         Assert::same($info->title, 'The OpenGraph title & more');
         Assert::same($info->description, 'Line one. Line two.');
         Assert::same($info->image, 'https://example.com/img/cover.jpg');
@@ -92,7 +99,7 @@ final class PreviewProviderTest
     {
         $provider = new PreviewProvider(fetcher: $this->fetcher(Http::client([])), extractors: []);
 
-        Assert::same($provider->fromHtml(html: '<title>T</title>', pageUrl: 'https://example.com/')->error(), PreviewFailure::EmptyPage);
+        Assert::same($provider->fromHtml(html: '<title>T</title>', pageUrl: 'https://example.com/')->error()?->reason, PreviewFailureReason::EmptyPage);
     }
 
     public function limitsAreApplied(): void
@@ -108,7 +115,7 @@ final class PreviewProviderTest
     {
         $client = Http::client(['https://example.com/' => Http::html(Fixtures::read('none.html'))]);
 
-        Assert::same($this->provider($client)->preview(url: 'https://example.com/')->error(), PreviewFailure::EmptyPage);
+        Assert::same($this->provider($client)->preview(url: 'https://example.com/')->error()?->reason, PreviewFailureReason::EmptyPage);
     }
 
     public function pageUrlIsUsedWhenNothingNamesIt(): void
@@ -120,32 +127,89 @@ final class PreviewProviderTest
     }
 
     #[DataProvider('failureProvider')]
-    public function fetchFailuresAreReported(string $url, ClientInterface $client, PreviewFailure $expected): void
+    public function fetchFailuresAreReported(string $url, ClientInterface $client, PreviewFailureReason $expected): void
     {
-        Assert::same($this->provider($client)->preview(url: $url)->error(), $expected);
+        Assert::same($this->provider($client)->preview(url: $url)->error()?->reason, $expected);
     }
 
     public static function failureProvider(): iterable
     {
-        yield 'policy' => ['http://127.0.0.1/', Http::client([]), PreviewFailure::PolicyRejected];
-        yield 'network' => ['https://example.com/', Http::failing(), PreviewFailure::Network];
-        yield 'not html' => ['https://example.com/', Http::client(['https://example.com/' => new Response(200, ['Content-Type' => 'image/png'], 'x')]), PreviewFailure::NotHtml];
-        yield 'status' => ['https://example.com/', Http::client(['https://example.com/' => Http::html('x', status: 404)]), PreviewFailure::HttpStatus];
-        yield 'redirect loop' => ['https://example.com/', Http::client(['https://example.com/' => Http::redirect('/')]), PreviewFailure::TooManyRedirects];
-        yield 'redirect into the intranet' => ['https://example.com/', Http::client(['https://example.com/' => Http::redirect('http://10.0.0.1/')]), PreviewFailure::PolicyRejected];
+        yield 'policy' => ['http://127.0.0.1/', Http::client([]), PreviewFailureReason::PolicyRejected];
+        yield 'network' => ['https://example.com/', Http::failing(), PreviewFailureReason::Network];
+        yield 'refused by the client' => ['https://example.com/', Http::refusing(), PreviewFailureReason::ClientRefused];
+        yield 'unexpected content type' => ['https://example.com/', Http::client(['https://example.com/' => new Response(200, ['Content-Type' => 'image/png'], 'x')]), PreviewFailureReason::UnexpectedContentType];
+        yield 'status' => ['https://example.com/', Http::client(['https://example.com/' => Http::html('x', status: 404)]), PreviewFailureReason::HttpStatus];
+        yield 'redirect loop' => ['https://example.com/', Http::client(['https://example.com/' => Http::redirect('/')]), PreviewFailureReason::TooManyRedirects];
+        yield 'redirect into the intranet' => ['https://example.com/', Http::client(['https://example.com/' => Http::redirect('http://10.0.0.1/')]), PreviewFailureReason::PolicyRejected];
+    }
+
+    public function aStatusFailureKeepsTheStatusAndRetryAfter(): void
+    {
+        $client = Http::client(['https://example.com/' => new Response(429, ['Retry-After' => '60'])]);
+
+        $failure = $this->provider($client)->preview(url: 'https://example.com/')->error();
+
+        Assert::same($failure?->reason, PreviewFailureReason::HttpStatus);
+        Assert::same($failure?->status, 429);
+        Assert::same($failure?->retryAfterSeconds, 60);
+        Assert::true($failure?->isTransient() === true);
     }
 
     #[DataProvider('everyFailureProvider')]
-    public function everyFetchFailureHasAPreviewCounterpart(FetchFailure $fetch): void
+    public function everyFetchFailureHasAPreviewCounterpart(FetchFailureReason $fetch): void
     {
-        Assert::same(PreviewFailure::fromFetch($fetch)->value, $fetch->value);
+        $preview = PreviewFailure::fromFetch(new FetchFailure(reason: $fetch, status: 503, retryAfterSeconds: 7));
+
+        Assert::same($preview->reason->value, $fetch->value);
+        Assert::same($preview->reason, PreviewFailureReason::fromFetch($fetch));
+        Assert::same($preview->status, 503);
+        Assert::same($preview->retryAfterSeconds, 7);
+        Assert::same($preview->isTransient(), (new FetchFailure(reason: $fetch, status: 503))->isTransient());
     }
 
     public static function everyFailureProvider(): iterable
     {
-        foreach (FetchFailure::cases() as $case) {
+        foreach (FetchFailureReason::cases() as $case) {
             yield $case->name => [$case];
         }
+    }
+
+    /**
+     * The taxonomy of the README, row by row.
+     */
+    #[DataProvider('transienceProvider')]
+    public function transientFailuresAreTheOnesWorthRetrying(PreviewFailureReason $reason, ?int $status, bool $transient): void
+    {
+        Assert::same((new PreviewFailure(reason: $reason, status: $status))->isTransient(), $transient);
+    }
+
+    public static function transienceProvider(): iterable
+    {
+        yield 'policy' => [PreviewFailureReason::PolicyRejected, null, false];
+        yield 'network' => [PreviewFailureReason::Network, null, true];
+        yield 'client refused' => [PreviewFailureReason::ClientRefused, null, false];
+        yield 'too many redirects' => [PreviewFailureReason::TooManyRedirects, null, false];
+        yield 'invalid redirect' => [PreviewFailureReason::InvalidRedirect, null, false];
+        yield 'budget' => [PreviewFailureReason::BudgetExceeded, null, true];
+        yield 'content type' => [PreviewFailureReason::UnexpectedContentType, null, false];
+        yield 'too large' => [PreviewFailureReason::TooLarge, null, false];
+        yield 'missing token' => [PreviewFailureReason::MissingToken, null, false];
+        yield 'empty page' => [PreviewFailureReason::EmptyPage, null, false];
+        yield 'status unknown' => [PreviewFailureReason::HttpStatus, null, false];
+        yield '304' => [PreviewFailureReason::HttpStatus, 304, false];
+        yield '400' => [PreviewFailureReason::HttpStatus, 400, false];
+        yield '403' => [PreviewFailureReason::HttpStatus, 403, false];
+        yield '404' => [PreviewFailureReason::HttpStatus, 404, false];
+        yield '407' => [PreviewFailureReason::HttpStatus, 407, false];
+        yield '408' => [PreviewFailureReason::HttpStatus, 408, true];
+        yield '410' => [PreviewFailureReason::HttpStatus, 410, false];
+        yield '425' => [PreviewFailureReason::HttpStatus, 425, true];
+        yield '429' => [PreviewFailureReason::HttpStatus, 429, true];
+        yield '499' => [PreviewFailureReason::HttpStatus, 499, false];
+        yield '500' => [PreviewFailureReason::HttpStatus, 500, true];
+        yield '503' => [PreviewFailureReason::HttpStatus, 503, true];
+        yield '599' => [PreviewFailureReason::HttpStatus, 599, true];
+        yield 'a status on a non-status failure' => [PreviewFailureReason::TooLarge, 503, false];
     }
 
     public function aSiteAdapterOutranksTheExtractorsAndTheyFillTheGaps(): void
@@ -168,7 +232,7 @@ final class PreviewProviderTest
     {
         $client = Http::client([]);
 
-        Assert::same($this->provider($client)->preview(url: 'http://localhost./youtube.com')->error(), PreviewFailure::PolicyRejected);
+        Assert::same($this->provider($client)->preview(url: 'http://localhost./youtube.com')->error()?->reason, PreviewFailureReason::PolicyRejected);
         Assert::same(Http::requests($client), []);
     }
 
@@ -203,7 +267,7 @@ final class PreviewProviderTest
     {
         $client = Http::client([]);
 
-        Assert::same($this->provider($client)->preview(url: 'https://www.instagram.com/p/CxYz123AbC/')->error(), PreviewFailure::MissingToken);
+        Assert::same($this->provider($client)->preview(url: 'https://www.instagram.com/p/CxYz123AbC/')->error()?->reason, PreviewFailureReason::MissingToken);
     }
 
     public function aMissingTokenStillLetsThePageSpeak(): void
@@ -261,6 +325,94 @@ final class PreviewProviderTest
 
         Assert::same($this->provider($client)->preview(url: 'https://example.com/p')->unwrap()->title, 'Fine');
         Assert::same(Http::requestedUrls($client), ['https://example.com/p']);
+    }
+
+    #[DataProvider('refusedPageUrlProvider')]
+    public function fromHtmlRefusesAPageUrlThePolicyRefuses(string $pageUrl): void
+    {
+        $client = Http::client([]);
+
+        $result = $this->provider($client)->fromHtml(html: '<title>T</title><link rel="alternate" type="application/json+oembed" href="/o">', pageUrl: $pageUrl);
+
+        Assert::same($result->error()?->reason, PreviewFailureReason::PolicyRejected);
+        Assert::same(Http::requests($client), []);
+    }
+
+    public static function refusedPageUrlProvider(): iterable
+    {
+        yield 'relative' => ['/a'];
+        yield 'empty' => [''];
+        yield 'javascript' => ['javascript:alert(1)'];
+        yield 'private' => ['http://10.0.0.1/'];
+        yield 'loopback' => ['http://localhost/'];
+    }
+
+    public function fromHtmlNormalisesThePageUrl(): void
+    {
+        $info = $this->provider(Http::client([]))->fromHtml(html: '<title>T</title>', pageUrl: 'HTTPS://Example.COM:443/a#frag')->unwrap();
+
+        Assert::same($info->url, 'https://example.com/a');
+    }
+
+    public function aPageCannotMoveWhereTheCardPoints(): void
+    {
+        $html = '<title>T</title><meta property="og:url" content="https://evil.example/elsewhere"><link rel="canonical" href="https://other.example/">';
+
+        $info = $this->provider(Http::client([]))->fromHtml(html: $html, pageUrl: 'https://example.com/a')->unwrap();
+
+        Assert::same($info->url, 'https://example.com/a');
+        Assert::same($info->canonicalUrl, 'https://evil.example/elsewhere');
+    }
+
+    public function theHostNamesTheSiteOnlyWhenAskedAndOnlyWhenNothingElseDoes(): void
+    {
+        $fetcher = $this->fetcher(Http::client([]));
+        $plain = new PreviewProvider(fetcher: $fetcher);
+        $withHost = new PreviewProvider(fetcher: $fetcher, hostAsSiteName: true);
+
+        Assert::null($plain->fromHtml(html: '<title>T</title>', pageUrl: 'https://www.example.com/')->unwrap()->siteName);
+        Assert::same($withHost->fromHtml(html: '<title>T</title>', pageUrl: 'https://www.example.com/')->unwrap()->siteName, 'example.com');
+        Assert::same($withHost->fromHtml(html: '<title>T</title>', pageUrl: 'https://news.example.com/')->unwrap()->siteName, 'news.example.com');
+        Assert::same($withHost->fromHtml(html: '<title>T</title>', pageUrl: 'https://wwwexample.com/')->unwrap()->siteName, 'wwwexample.com');
+        Assert::same($withHost->fromHtml(html: '<meta property="og:site_name" content="Own">', pageUrl: 'https://www.example.com/')->unwrap()->siteName, 'Own');
+        Assert::same($withHost->fromHtml(html: '<p>nothing</p>', pageUrl: 'https://www.example.com/')->error()?->reason, PreviewFailureReason::EmptyPage);
+    }
+
+    public function itIsALinkPreviewer(): void
+    {
+        Assert::instanceOf($this->provider(Http::client([])), LinkPreviewer::class);
+    }
+
+    public function markupOnlyTextFallsThroughToTheNextSource(): void
+    {
+        $html = '<meta property="og:title" content="&lt;b&gt;&lt;/b&gt;"><meta name="twitter:title" content="Real &amp;amp; title">';
+
+        $info = $this->provider(Http::client([]))->fromHtml(html: $html, pageUrl: 'https://example.com/')->unwrap();
+
+        Assert::same($info->title, 'Real & title');
+    }
+
+    public function theImageKeepsItsOwnDimensions(): void
+    {
+        $html = '<meta property="og:image" content="/og.png"><meta name="twitter:image" content="/tw.png">'
+            . '<meta name="twitter:image:width" content="800"><meta name="twitter:image:height" content="400">';
+
+        $info = $this->provider(Http::client([]))->fromHtml(html: $html, pageUrl: 'https://example.com/')->unwrap();
+
+        Assert::same($info->image, 'https://example.com/og.png');
+        Assert::null($info->imageWidth);
+        Assert::null($info->imageHeight);
+    }
+
+    public function anAdapterNamesTheProvider(): void
+    {
+        $client = Http::client(['https://www.youtube.com/oembed?url=https%3A%2F%2Fyoutu.be%2FdQw4w9WgXcQ&format=json' => Adapters::json(Adapters::fixture('youtube/oembed.json'))]);
+
+        $info = $this->provider($client)->preview(url: 'https://youtu.be/dQw4w9WgXcQ')->unwrap();
+
+        Assert::same($info->providerName, 'YouTube');
+        Assert::same($info->imageWidth, 480);
+        Assert::same($info->imageHeight, 360);
     }
 
     private function provider(ClientInterface $client): PreviewProvider

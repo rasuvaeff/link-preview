@@ -25,7 +25,7 @@ use RuntimeException;
  *     url: non-empty-string,
  *     options: array<string, mixed>,
  *     responses: array<string, array{file: string, type: string}>,
- *     expected: array<string, string>,
+ *     expected: array<string, string|int>,
  * }
  */
 final readonly class AdapterCorpus
@@ -44,6 +44,10 @@ final readonly class AdapterCorpus
         'publishedTime' => null,
         'type' => null,
         'embedUrl' => null,
+        'canonicalUrl' => null,
+        'imageWidth' => null,
+        'imageHeight' => null,
+        'providerName' => null,
     ];
 
     private function __construct() {}
@@ -64,7 +68,7 @@ final readonly class AdapterCorpus
     /**
      * @param Entry $entry
      *
-     * @return array{preview: array<string, string|null>|string, requests: list<string>}
+     * @return array{preview: array<string, string|int|null>|string, requests: list<string>}
      */
     public static function run(array $entry): array
     {
@@ -91,7 +95,7 @@ final readonly class AdapterCorpus
         $result = $provider->preview(url: $entry['url']);
 
         return [
-            'preview' => $result->isOk() ? $result->unwrap()->toArray() : (string) $result->error()?->value,
+            'preview' => $result->isOk() ? $result->unwrap()->toArray() : (string) $result->error()?->reason->value,
             'requests' => array_map(static fn($request): string => (string) $request->getUri(), $client->requests),
         ];
     }
@@ -99,7 +103,7 @@ final readonly class AdapterCorpus
     /**
      * @param Entry $entry
      *
-     * @return array<string, string|null>
+     * @return array<string, string|int|null>
      */
     public static function expected(array $entry): array
     {

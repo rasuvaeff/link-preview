@@ -57,6 +57,36 @@ final readonly class Values
     }
 
     /**
+     * An image side in pixels: a positive integer below 100 000, written as a number,
+     * as digits (`"1200"`, `"1200px"`) or as a schema.org `QuantitativeValue`
+     * (`{"value": 1200}`). Anything else is unknown.
+     *
+     * @return int<1, max>|null
+     */
+    public static function dimension(mixed $value): ?int
+    {
+        if (\is_array($value)) {
+            return \is_array($value['value'] ?? null) ? null : self::dimension($value['value'] ?? null);
+        }
+
+        if (\is_float($value)) {
+            $value = fmod($value, 1.0) === 0.0 ? \sprintf('%.0F', $value) : null;
+        }
+
+        if (\is_int($value)) {
+            $value = (string) $value;
+        }
+
+        if (!\is_string($value) || preg_match('/\A\s*\d{1,5}(?:px)?\s*\z/', $value) !== 1) {
+            return null;
+        }
+
+        $side = (int) $value;
+
+        return $side >= 1 ? $side : null;
+    }
+
+    /**
      * A name, not a profile link: `article:author` is a URL on many sites.
      */
     public static function name(?string $value): ?string

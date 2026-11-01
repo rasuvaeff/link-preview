@@ -8,8 +8,12 @@ use GuzzleHttp\Psr7\HttpFactory;
 use GuzzleHttp\Psr7\Response;
 use InvalidArgumentException;
 use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\ResponseInterface;
 use Rasuvaeff\LinkPreview\Fetch\Fetcher;
 use Rasuvaeff\LinkPreview\Fetch\FetchFailure;
+use Rasuvaeff\LinkPreview\Fetch\FetchFailureReason;
+use Rasuvaeff\LinkPreview\Fetch\RetryAfter;
+use Rasuvaeff\LinkPreview\Fetch\Transience;
 use Rasuvaeff\LinkPreview\Fetch\UrlPolicy;
 use Rasuvaeff\LinkPreview\Fetch\UserAgentMap;
 use Rasuvaeff\LinkPreview\Tests\Support\Adapters;
@@ -17,14 +21,21 @@ use Rasuvaeff\LinkPreview\Tests\Support\Http;
 use Rasuvaeff\PropertyTesting\Classify;
 use Rasuvaeff\PropertyTesting\Gen;
 use Rasuvaeff\PropertyTesting\Property;
+use Rasuvaeff\Understudy\Arg;
+use Rasuvaeff\Understudy\Understudy;
 use Testo\Assert;
 use Testo\Codecov\Covers;
 use Testo\Data\DataProvider;
 use Testo\Expect;
 use Testo\Test;
 
+use function Rasuvaeff\Understudy\when;
+
 #[Test]
 #[Covers(Fetcher::class)]
+#[Covers(FetchFailure::class)]
+#[Covers(RetryAfter::class)]
+#[Covers(Transience::class)]
 final class FetcherTest
 {
     public function fetchesAPage(): void
@@ -124,7 +135,7 @@ final class FetcherTest
 
         $result = $this->fetcher($client, maxRedirects: 1)->fetch(url: 'https://example.com/a');
 
-        Assert::same($result->error(), FetchFailure::TooManyRedirects);
+        Assert::same($result->error()?->reason, FetchFailureReason::TooManyRedirects);
         Assert::same(Http::requestedUrls($client), ['https://example.com/a', 'https://example.com/b']);
     }
 
@@ -132,14 +143,14 @@ final class FetcherTest
     {
         $client = Http::client(['https://example.com/a' => Http::redirect('/b')]);
 
-        Assert::same($this->fetcher($client, maxRedirects: 0)->fetch(url: 'https://example.com/a')->error(), FetchFailure::TooManyRedirects);
+        Assert::same($this->fetcher($client, maxRedirects: 0)->fetch(url: 'https://example.com/a')->error()?->reason, FetchFailureReason::TooManyRedirects);
     }
 
     public function redirectLoopEndsAtTheLimit(): void
     {
         $client = Http::client(['https://example.com/a' => Http::redirect('/a')]);
 
-        Assert::same($this->fetcher($client, maxRedirects: 3)->fetch(url: 'https://example.com/a')->error(), FetchFailure::TooManyRedirects);
+        Assert::same($this->fetcher($client, maxRedirects: 3)->fetch(url: 'https://example.com/a')->error()?->reason, FetchFailureReason::TooManyRedirects);
         Assert::same(\count(Http::requests($client)), 4);
     }
 
@@ -153,7 +164,7 @@ final class FetcherTest
 
         $result = $this->fetcher($client)->fetch(url: 'https://example.com/a');
 
-        Assert::same($result->error(), FetchFailure::PolicyRejected);
+        Assert::same($result->error()?->reason, FetchFailureReason::PolicyRejected);
         Assert::same(Http::requestedUrls($client), ['https://example.com/a']);
     }
 
@@ -171,7 +182,7 @@ final class FetcherTest
     {
         $client = Http::client([]);
 
-        Assert::same($this->fetcher($client)->fetch(url: 'http://10.0.0.1/')->error(), FetchFailure::PolicyRejected);
+        Assert::same($this->fetcher($client)->fetch(url: 'http://10.0.0.1/')->error()?->reason, FetchFailureReason::PolicyRejected);
         Assert::same(Http::requests($client), []);
     }
 
@@ -192,7 +203,7 @@ final class FetcherTest
     {
         $client = Http::client(['https://example.com/a' => new Response(302, $location === '' ? [] : ['Location' => $location])]);
 
-        Assert::same($this->fetcher($client)->fetch(url: 'https://example.com/a')->error(), FetchFailure::InvalidRedirect);
+        Assert::same($this->fetcher($client)->fetch(url: 'https://example.com/a')->error()?->reason, FetchFailureReason::InvalidRedirect);
     }
 
     public static function badRedirectProvider(): iterable
@@ -213,7 +224,7 @@ final class FetcherTest
 
         $result = $this->fetcher($client, chainBudgetSeconds: 0.0)->fetch(url: 'https://example.com/a');
 
-        Assert::same($result->error(), FetchFailure::BudgetExceeded);
+        Assert::same($result->error()?->reason, FetchFailureReason::BudgetExceeded);
         Assert::same(Http::requestedUrls($client), ['https://example.com/a']);
     }
 
@@ -236,14 +247,14 @@ final class FetcherTest
 
     public function transportFailureIsAFailureNotAnException(): void
     {
-        Assert::same($this->fetcher(Http::failing())->fetch(url: 'https://example.com/')->error(), FetchFailure::Network);
+        Assert::same($this->fetcher(Http::failing())->fetch(url: 'https://example.com/')->error()?->reason, FetchFailureReason::Network);
     }
 
     public function transportFailureOnALaterHop(): void
     {
         $client = Http::client(['https://example.com/a' => Http::redirect('https://gone.example/')]);
 
-        Assert::same($this->fetcher($client)->fetch(url: 'https://example.com/a')->error(), FetchFailure::Network);
+        Assert::same($this->fetcher($client)->fetch(url: 'https://example.com/a')->error()?->reason, FetchFailureReason::Network);
     }
 
     #[DataProvider('statusProvider')]
@@ -251,7 +262,7 @@ final class FetcherTest
     {
         $client = Http::client(['https://example.com/' => Http::html('<p>x</p>', status: $status)]);
 
-        Assert::same($this->fetcher($client)->fetch(url: 'https://example.com/')->error(), FetchFailure::HttpStatus);
+        Assert::same($this->fetcher($client)->fetch(url: 'https://example.com/')->error()?->reason, FetchFailureReason::HttpStatus);
     }
 
     public static function statusProvider(): iterable
@@ -283,7 +294,7 @@ final class FetcherTest
     {
         $client = Http::client(['https://example.com/' => new Response(200, $contentType === '' ? [] : ['Content-Type' => $contentType], 'body')]);
 
-        Assert::same($this->fetcher($client)->fetch(url: 'https://example.com/')->error(), FetchFailure::NotHtml);
+        Assert::same($this->fetcher($client)->fetch(url: 'https://example.com/')->error()?->reason, FetchFailureReason::UnexpectedContentType);
     }
 
     public static function notHtmlProvider(): iterable
@@ -301,14 +312,14 @@ final class FetcherTest
         $response = new Response(200, ['Content-Type' => 'text/html', 'Content-Length' => '101'], 'x');
         $client = Http::client(['https://example.com/' => $response]);
 
-        Assert::same($this->fetcher($client, maxBodyBytes: 100)->fetch(url: 'https://example.com/')->error(), FetchFailure::TooLarge);
+        Assert::same($this->fetcher($client, maxBodyBytes: 100)->fetch(url: 'https://example.com/')->error()?->reason, FetchFailureReason::TooLarge);
     }
 
     public function actualBodyOverTheLimitFailsEvenWithoutALengthHeader(): void
     {
         $client = Http::client(['https://example.com/' => Http::html(str_repeat('a', 101))]);
 
-        Assert::same($this->fetcher($client, maxBodyBytes: 100)->fetch(url: 'https://example.com/')->error(), FetchFailure::TooLarge);
+        Assert::same($this->fetcher($client, maxBodyBytes: 100)->fetch(url: 'https://example.com/')->error()?->reason, FetchFailureReason::TooLarge);
     }
 
     public function actualBodyOverTheLimitFailsWhenTheHeaderLies(): void
@@ -316,7 +327,7 @@ final class FetcherTest
         $response = new Response(200, ['Content-Type' => 'text/html', 'Content-Length' => '5'], str_repeat('a', 20_000));
         $client = Http::client(['https://example.com/' => $response]);
 
-        Assert::same($this->fetcher($client, maxBodyBytes: 10_000)->fetch(url: 'https://example.com/')->error(), FetchFailure::TooLarge);
+        Assert::same($this->fetcher($client, maxBodyBytes: 10_000)->fetch(url: 'https://example.com/')->error()?->reason, FetchFailureReason::TooLarge);
     }
 
     public function declaredLengthExactlyAtTheLimitPasses(): void
@@ -450,7 +461,7 @@ final class FetcherTest
     {
         $client = Http::client(['https://api.example.com/x' => new Response(200, ['Content-Type' => $contentType], '<p>')]);
 
-        Assert::same($this->fetcher($client)->fetchJson(url: 'https://api.example.com/x')->error(), FetchFailure::NotHtml);
+        Assert::same($this->fetcher($client)->fetchJson(url: 'https://api.example.com/x')->error()?->reason, FetchFailureReason::UnexpectedContentType);
     }
 
     public static function notJsonProvider(): iterable
@@ -465,7 +476,7 @@ final class FetcherTest
     {
         $client = Http::client(['https://api.example.com/x' => Adapters::json('{}')]);
 
-        Assert::same($this->fetcher($client)->fetch(url: 'https://api.example.com/x')->error(), FetchFailure::NotHtml);
+        Assert::same($this->fetcher($client)->fetch(url: 'https://api.example.com/x')->error()?->reason, FetchFailureReason::UnexpectedContentType);
     }
 
     public function jsonFetchObeysThePolicyOnEveryHop(): void
@@ -474,9 +485,9 @@ final class FetcherTest
             'https://api.example.com/x' => Http::redirect('http://169.254.169.254/latest/meta-data/'),
         ]);
 
-        Assert::same($this->fetcher($client)->fetchJson(url: 'https://api.example.com/x')->error(), FetchFailure::PolicyRejected);
+        Assert::same($this->fetcher($client)->fetchJson(url: 'https://api.example.com/x')->error()?->reason, FetchFailureReason::PolicyRejected);
         Assert::same(Http::requestedUrls($client), ['https://api.example.com/x']);
-        Assert::same($this->fetcher($client)->fetchJson(url: 'http://127.0.0.1/api')->error(), FetchFailure::PolicyRejected);
+        Assert::same($this->fetcher($client)->fetchJson(url: 'http://127.0.0.1/api')->error()?->reason, FetchFailureReason::PolicyRejected);
     }
 
     public function customHeadersGoToTheFirstHostOnly(): void
@@ -500,6 +511,203 @@ final class FetcherTest
 
         Assert::same($fetcher->check(url: 'HTTPS://Example.COM:443/a#f')->value(), 'https://example.com/a');
         Assert::same($fetcher->check(url: 'http://127.0.0.1/')->error(), \Rasuvaeff\LinkPreview\Fetch\UrlRejection::PrivateAddress);
+    }
+
+    public function aStatusFailureCarriesTheStatusAndRetryAfter(): void
+    {
+        $client = Http::client(['https://example.com/' => new Response(503, ['Retry-After' => '120'])]);
+
+        $failure = $this->fetcher($client)->fetch(url: 'https://example.com/')->error();
+
+        Assert::same($failure?->reason, FetchFailureReason::HttpStatus);
+        Assert::same($failure?->status, 503);
+        Assert::same($failure?->retryAfterSeconds, 120);
+        Assert::true($failure?->isTransient() === true);
+    }
+
+    #[DataProvider('retryAfterProvider')]
+    public function retryAfterIsReadAsSecondsOrAsADateAgainstTheResponseDate(array $headers, ?int $expected): void
+    {
+        $client = Http::client(['https://example.com/' => new Response(429, $headers)]);
+
+        Assert::same($this->fetcher($client)->fetch(url: 'https://example.com/')->error()?->retryAfterSeconds, $expected);
+    }
+
+    public static function retryAfterProvider(): iterable
+    {
+        yield 'none' => [[], null];
+        yield 'delta seconds' => [['Retry-After' => ' 30 '], 30];
+        yield 'zero' => [['Retry-After' => '0'], 0];
+        yield 'capped at a day' => [['Retry-After' => '9999999999'], 86_400];
+        yield 'one under the cap' => [['Retry-After' => '86399'], 86_399];
+        yield 'negative' => [['Retry-After' => '-5'], null];
+        yield 'fraction' => [['Retry-After' => '1.5'], null];
+        yield 'date against Date' => [['Retry-After' => 'Wed, 21 Oct 2026 07:28:00 GMT', 'Date' => 'Wed, 21 Oct 2026 07:26:30 GMT'], 90];
+        yield 'date in the past' => [['Retry-After' => 'Wed, 21 Oct 2026 07:20:00 GMT', 'Date' => 'Wed, 21 Oct 2026 07:26:30 GMT'], 0];
+        yield 'date far ahead is capped' => [['Retry-After' => 'Wed, 21 Oct 2026 07:28:00 GMT', 'Date' => 'Wed, 14 Oct 2026 07:28:00 GMT'], 86_400];
+        yield 'date without Date' => [['Retry-After' => 'Wed, 21 Oct 2026 07:28:00 GMT'], null];
+        yield 'garbage' => [['Retry-After' => 'soon', 'Date' => 'Wed, 21 Oct 2026 07:26:30 GMT'], null];
+        yield 'garbage Date' => [['Retry-After' => 'Wed, 21 Oct 2026 07:28:00 GMT', 'Date' => 'yesterday'], null];
+    }
+
+    public function aNetworkErrorIsNetworkAndAnyOtherClientErrorIsARefusal(): void
+    {
+        $network = $this->fetcher(Http::failing())->fetch(url: 'https://example.com/')->error();
+        $refused = $this->fetcher(Http::refusing())->fetch(url: 'https://example.com/')->error();
+
+        Assert::same($network?->reason, FetchFailureReason::Network);
+        Assert::true($network?->isTransient() === true);
+        Assert::same($refused?->reason, FetchFailureReason::ClientRefused);
+        Assert::false($refused?->isTransient() ?? true);
+        Assert::null($refused?->status);
+    }
+
+    public function otherFailuresCarryNoStatus(): void
+    {
+        $failure = $this->fetcher(Http::client(['https://example.com/' => Http::redirect('/')]), maxRedirects: 0)->fetch(url: 'https://example.com/')->error();
+
+        Assert::same($failure?->reason, FetchFailureReason::TooManyRedirects);
+        Assert::null($failure?->status);
+        Assert::null($failure?->retryAfterSeconds);
+    }
+
+    public function fetchesMediaOfAnAcceptedType(): void
+    {
+        $client = Http::client([
+            'https://cdn.example.com/a' => Http::redirect('https://cdn.example.com/a.png'),
+            'https://cdn.example.com/a.png' => new Response(200, ['Content-Type' => 'Image/PNG'], 'PNGDATA'),
+        ]);
+
+        $media = $this->fetcher($client)->fetchMedia(url: 'https://cdn.example.com/a', acceptedTypes: ['image/jpeg', 'image/png'], maxBytes: 7)->unwrap();
+
+        Assert::same($media->url, 'https://cdn.example.com/a.png');
+        Assert::same($media->body, 'PNGDATA');
+        Assert::same($media->contentType, 'image/png');
+        Assert::same($media->redirects, 1);
+        Assert::same(Http::requests($client)[0]->getHeaderLine('Accept'), 'image/jpeg, image/png');
+        Assert::same(Http::requests($client)[0]->getHeaderLine('User-Agent'), UserAgentMap::DEFAULT);
+    }
+
+    #[DataProvider('mediaTypeProvider')]
+    public function mediaTypesMatchExactlyOrByFamily(string $contentType, bool $accepted): void
+    {
+        $client = Http::client(['https://cdn.example.com/x' => new Response(200, ['Content-Type' => $contentType], 'x')]);
+
+        $result = $this->fetcher($client)->fetchMedia(url: 'https://cdn.example.com/x', acceptedTypes: ['image/*', 'video/mp4'], maxBytes: 10);
+
+        Assert::same($result->isOk(), $accepted);
+        Assert::same($result->error()?->reason, $accepted ? null : FetchFailureReason::UnexpectedContentType);
+    }
+
+    public static function mediaTypeProvider(): iterable
+    {
+        yield 'family member' => ['image/webp', true];
+        yield 'exact' => ['video/mp4', true];
+        yield 'with parameters' => ['image/png; q=1', true];
+        yield 'other member of an exact family' => ['video/webm', false];
+        yield 'family look-alike' => ['imagex/png', false];
+        yield 'bare family name' => ['image', false];
+        yield 'html' => ['text/html', false];
+        yield 'missing' => ['', false];
+    }
+
+    public function mediaHasItsOwnSizeLimit(): void
+    {
+        $client = Http::client([
+            'https://cdn.example.com/big' => new Response(200, ['Content-Type' => 'image/png'], str_repeat('x', 11)),
+            'https://cdn.example.com/declared' => new Response(200, ['Content-Type' => 'image/png', 'Content-Length' => '11'], 'x'),
+            'https://cdn.example.com/fits' => new Response(200, ['Content-Type' => 'image/png'], str_repeat('x', 10)),
+        ]);
+        $fetcher = $this->fetcher($client, maxBodyBytes: 1);
+
+        Assert::same($fetcher->fetchMedia(url: 'https://cdn.example.com/big', acceptedTypes: ['image/png'], maxBytes: 10)->error()?->reason, FetchFailureReason::TooLarge);
+        Assert::same($fetcher->fetchMedia(url: 'https://cdn.example.com/declared', acceptedTypes: ['image/png'], maxBytes: 10)->error()?->reason, FetchFailureReason::TooLarge);
+        Assert::same($fetcher->fetchMedia(url: 'https://cdn.example.com/fits', acceptedTypes: ['image/png'], maxBytes: 10)->unwrap()->body, str_repeat('x', 10));
+    }
+
+    public function mediaObeysThePolicyOnEveryHop(): void
+    {
+        $client = Http::client(['https://cdn.example.com/x' => Http::redirect('http://169.254.169.254/latest/meta-data/')]);
+
+        Assert::same($this->fetcher($client)->fetchMedia(url: 'https://cdn.example.com/x', acceptedTypes: ['image/*'], maxBytes: 10)->error()?->reason, FetchFailureReason::PolicyRejected);
+        Assert::same(Http::requestedUrls($client), ['https://cdn.example.com/x']);
+    }
+
+    #[DataProvider('invalidMediaProvider')]
+    public function rejectsAnInvalidMediaRequest(array $types, int $maxBytes): void
+    {
+        Expect::exception(InvalidArgumentException::class);
+
+        $this->fetcher(Http::client([]))->fetchMedia(url: 'https://cdn.example.com/x', acceptedTypes: $types, maxBytes: $maxBytes);
+    }
+
+    public static function invalidMediaProvider(): iterable
+    {
+        yield 'no types' => [[], 10];
+        yield 'zero bytes' => [['image/png'], 0];
+        yield 'no subtype' => [['image'], 10];
+        yield 'upper case' => [['Image/png'], 10];
+        yield 'wildcard type' => [['*/*'], 10];
+        yield 'parameter' => [['image/png; q=1'], 10];
+        yield 'trailing newline' => [["image/png\n"], 10];
+        yield 'second type broken' => [['image/png', 'bad'], 10];
+    }
+
+
+    #[DataProvider('edgeStatusProvider')]
+    public function theStatusIsKeptWhenItIsAnHttpStatus(int $status, ?int $kept): void
+    {
+        $response = Understudy::for(ResponseInterface::class);
+        when(fn() => $response->getStatusCode())->returns($status);
+        when(fn() => $response->getHeaderLine(Arg::any()))->returns('');
+        $client = Understudy::for(ClientInterface::class);
+        when(fn() => $client->sendRequest(Arg::any()))->returns($response);
+
+        $failure = $this->fetcher($client)->fetch(url: 'https://example.com/')->error();
+
+        Assert::same($failure?->reason, FetchFailureReason::HttpStatus);
+        Assert::same($failure?->status, $kept);
+    }
+
+    public static function edgeStatusProvider(): iterable
+    {
+        yield 'below' => [99, null];
+        yield 'first' => [100, 100];
+        yield 'last' => [599, 599];
+        yield 'above' => [600, null];
+    }
+
+    public function retryAfterIsReadFromUntrimmedHeaders(): void
+    {
+        $delta = Understudy::for(ResponseInterface::class);
+        when(fn() => $delta->getStatusCode())->returns(503);
+        when(fn() => $delta->getHeaderLine('Retry-After'))->returns(" 30\t");
+        $dated = Understudy::for(ResponseInterface::class);
+        when(fn() => $dated->getStatusCode())->returns(503);
+        when(fn() => $dated->getHeaderLine('Retry-After'))->returns(' Wed, 21 Oct 2026 07:28:00 GMT ');
+        when(fn() => $dated->getHeaderLine('Date'))->returns(' Wed, 21 Oct 2026 07:27:00 GMT ');
+
+        Assert::same(RetryAfter::seconds($delta), 30);
+        Assert::same(RetryAfter::seconds($dated), 60);
+    }
+
+    public function aMediaLimitOfOneByteIsValid(): void
+    {
+        $client = Http::client(['https://cdn.example.com/x' => new Response(200, ['Content-Type' => 'image/png'], 'x')]);
+
+        Assert::same($this->fetcher($client)->fetchMedia(url: 'https://cdn.example.com/x', acceptedTypes: ['image/png'], maxBytes: 1)->unwrap()->body, 'x');
+    }
+
+    public function aFailureIsTransientByItsReasonAndStatus(): void
+    {
+        Assert::true((new FetchFailure(FetchFailureReason::Network))->isTransient());
+        Assert::true((new FetchFailure(FetchFailureReason::BudgetExceeded))->isTransient());
+        Assert::true((new FetchFailure(FetchFailureReason::HttpStatus, status: 500))->isTransient());
+        Assert::true((new FetchFailure(FetchFailureReason::HttpStatus, status: 408))->isTransient());
+        Assert::false((new FetchFailure(FetchFailureReason::HttpStatus, status: 499))->isTransient());
+        Assert::false((new FetchFailure(FetchFailureReason::HttpStatus))->isTransient());
+        Assert::false((new FetchFailure(FetchFailureReason::ClientRefused))->isTransient());
+        Assert::false((new FetchFailure(FetchFailureReason::TooLarge, status: 503))->isTransient());
     }
 
     private function fetcher(

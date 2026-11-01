@@ -35,6 +35,7 @@ final class OEmbedExtractorTest
         Assert::same($metadata->title, 'T');
         Assert::same($metadata->authorName, 'A');
         Assert::same($metadata->siteName, 'P');
+        Assert::same($metadata->providerName, 'P');
         Assert::same($metadata->image, 'https://example.com/t.png');
         Assert::same($metadata->embedUrl, 'https://player.example.net/v/1');
         Assert::same($metadata->type, 'video');
@@ -135,6 +136,28 @@ final class OEmbedExtractorTest
         Assert::null($embed('<blockquote><a href="https://x.example/">x</a></blockquote>'));
         Assert::null($embed('<iframe src="javascript:alert(1)"></iframe>'));
         Assert::null($embed('<iframe data-src="https://p.example.net/e"></iframe>'));
+    }
+
+
+    #[DataProvider('dimensionProvider')]
+    public function readsTheThumbnailOrPhotoSides(string $answer, ?string $image, ?int $width, ?int $height): void
+    {
+        $client = Http::client(['https://example.com/oembed' => Adapters::json($answer)]);
+
+        $metadata = $this->extract($client, sprintf(self::LINK, '/oembed'))->unwrap();
+
+        Assert::same([$metadata->image, $metadata->imageWidth, $metadata->imageHeight], [$image, $width, $height]);
+    }
+
+    public static function dimensionProvider(): iterable
+    {
+        yield 'thumbnail' => ['{"type":"video","thumbnail_url":"/t.png","thumbnail_width":480,"thumbnail_height":360,"width":200,"height":113}', 'https://example.com/t.png', 480, 360];
+        yield 'thumbnail sides as strings' => ['{"type":"video","thumbnail_url":"/t.png","thumbnail_width":"480","thumbnail_height":"360"}', 'https://example.com/t.png', 480, 360];
+        yield 'photo' => ['{"type":"photo","url":"/p.jpg","width":1024,"height":768,"thumbnail_width":1}', 'https://example.com/p.jpg', 1024, 768];
+        yield 'player sides are not image sides' => ['{"type":"video","title":"T","width":200,"height":113}', null, null, null];
+        yield 'percent and null' => ['{"type":"rich","thumbnail_url":"/t.png","thumbnail_width":"100%","thumbnail_height":null,"width":550,"height":null}', 'https://example.com/t.png', null, null];
+        yield 'float sides' => ['{"type":"video","thumbnail_url":"/t.png","thumbnail_width":480.0,"thumbnail_height":360.0}', 'https://example.com/t.png', 480, 360];
+        yield 'unusable thumbnail drops the sides' => ['{"type":"video","title":"T","thumbnail_url":"javascript:x","thumbnail_width":480,"thumbnail_height":360}', null, null, null];
     }
 
     private function extract(\Psr\Http\Client\ClientInterface $client, string $head): \Rasuvaeff\Result\Result

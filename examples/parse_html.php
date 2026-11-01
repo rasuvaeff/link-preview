@@ -50,7 +50,7 @@ $info = $provider->preview(url: 'https://example.com/moved')->unwrap();
 echo json_encode($info->toArray(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), "\n";
 
 $refused = $provider->preview(url: 'http://169.254.169.254/latest/meta-data/');
-echo 'metadata endpoint: ', $refused->error()?->value, "\n";
+echo 'metadata endpoint: ', $refused->error()?->reason->value, "\n";
 
 $policy = new UrlPolicy();
 echo 'policy on 0x7f000001: ', $policy->check(url: 'http://0x7f000001/')->error()?->value, "\n";

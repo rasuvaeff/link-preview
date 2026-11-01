@@ -7,6 +7,7 @@ namespace Rasuvaeff\LinkPreview\Fetch;
 use InvalidArgumentException;
 use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
+use Psr\Http\Client\NetworkExceptionInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 use Rasuvaeff\LinkPreview\Url\UrlResolver;
@@ -27,8 +28,13 @@ use Rasuvaeff\Result\Result;
  * - the response size limit is applied to the body as the client hands it
  *   over — a client that buffers has already paid for the bytes. Set the
  *   client's own limit as well;
- * - the connection address cannot be pinned, so DNS rebinding between the
- *   policy check and the connect is not excluded.
+ * - the connection address cannot be pinned by a plain PSR-18 client, so DNS
+ *   rebinding between the policy check and the connect is not excluded - give
+ *   it a pinning client (`rasuvaeff/pinned-http-client`) to close that.
+ *
+ * Client exceptions are classified by their PSR-18 interface:
+ * `NetworkExceptionInterface` is {@see FetchFailureReason::Network} (transient),
+ * any other `ClientExceptionInterface` is {@see FetchFailureReason::ClientRefused}.
  *
  * @api
  */
@@ -41,6 +47,8 @@ final readonly class Fetcher
     private const string HTML_ACCEPT = 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.1';
 
     private const string JSON_ACCEPT = 'application/json';
+
+    private const string MEDIA_TYPE = '~\A[a-z0-9][a-z0-9!#$&^_.+-]*/(?:\*|[a-z0-9][a-z0-9!#$&^_.+-]*)\z~';
 
     /**
      * @param float|null $chainBudgetSeconds wall-clock budget of the whole redirect chain
@@ -84,7 +92,13 @@ final readonly class Fetcher
      */
     public function fetch(string $url): Result
     {
-        return $this->get($url, json: false, headers: []);
+        return $this->get(
+            url: $url,
+            accept: self::HTML_ACCEPT,
+            accepts: static fn(string $type): bool => \in_array($type, self::HTML_TYPES, strict: true),
+            headers: [],
+            maxBytes: $this->maxBodyBytes,
+        );
     }
 
     /**
@@ -101,15 +115,68 @@ final readonly class Fetcher
      */
     public function fetchJson(string $url, #[\SensitiveParameter] array $headers = []): Result
     {
-        return $this->get($url, json: true, headers: $headers);
+        return $this->get(
+            url: $url,
+            accept: self::JSON_ACCEPT,
+            accepts: static fn(string $type): bool => $type === 'application/json' || str_ends_with($type, '+json'),
+            headers: $headers,
+            maxBytes: $this->maxBodyBytes,
+        );
     }
 
     /**
+     * Fetches a media file - an image of a preview, say - under the same policy,
+     * redirect and `User-Agent` rules as a page, with its own size limit.
+     *
+     * @param list<string> $acceptedTypes media types (`image/png`) or whole families (`image/*`), lower-case
+     * @param int $maxBytes the body limit of this fetch, at least 1; it replaces `maxBodyBytes`. A client with a
+     *        body limit of its own (`PinnedClient::$maxBodyBytes`) must allow at least this much, or a larger
+     *        body is {@see FetchFailureReason::ClientRefused}
+     *
+     * @throws InvalidArgumentException when no type is given, a type is malformed or the limit is not positive
+     *
+     * @return Result<FetchedPage, FetchFailure> the body in `FetchedPage::$body`, its type in `$contentType`
+     */
+    public function fetchMedia(string $url, array $acceptedTypes, int $maxBytes): Result
+    {
+        if ($acceptedTypes === []) {
+            throw new InvalidArgumentException('At least one media type must be accepted');
+        }
+
+        foreach ($acceptedTypes as $type) {
+            if (preg_match(self::MEDIA_TYPE, $type) !== 1) {
+                throw new InvalidArgumentException(\sprintf('Invalid media type "%s"', $type));
+            }
+        }
+
+        if ($maxBytes < 1) {
+            throw new InvalidArgumentException('Max body size must be positive');
+        }
+
+        return $this->get(
+            url: $url,
+            accept: implode(', ', $acceptedTypes),
+            accepts: static function (string $type) use ($acceptedTypes): bool {
+                foreach ($acceptedTypes as $accepted) {
+                    if ($type === $accepted || (str_ends_with($accepted, '/*') && str_starts_with($type, substr($accepted, 0, -1)))) {
+                        return true;
+                    }
+                }
+
+                return false;
+            },
+            headers: [],
+            maxBytes: $maxBytes,
+        );
+    }
+
+    /**
+     * @param \Closure(string): bool $accepts whether a media type is what was asked for
      * @param array<string, string> $headers
      *
      * @return Result<FetchedPage, FetchFailure>
      */
-    private function get(string $url, bool $json, array $headers): Result
+    private function get(string $url, string $accept, \Closure $accepts, array $headers, int $maxBytes): Result
     {
         $startedAt = (int) hrtime(as_number: true);
         $redirects = 0;
@@ -119,7 +186,7 @@ final readonly class Fetcher
             $checked = $this->policy->check(url: $url);
 
             if ($checked->isErr()) {
-                return Result::err(error: FetchFailure::PolicyRejected);
+                return $this->failure(FetchFailureReason::PolicyRejected);
             }
 
             $url = $checked->unwrap();
@@ -128,34 +195,42 @@ final readonly class Fetcher
             $origin ??= $host;
 
             if ($redirects > 0 && $this->budgetSpent($startedAt)) {
-                return Result::err(error: FetchFailure::BudgetExceeded);
+                return $this->failure(FetchFailureReason::BudgetExceeded);
             }
 
-            $response = $this->send($url, $host, $json, $host === $origin ? $headers : []);
+            $response = $this->send($url, $host, $accept, $host === $origin ? $headers : []);
 
-            if (!$response instanceof \Psr\Http\Message\ResponseInterface) {
-                return Result::err(error: FetchFailure::Network);
+            if ($response instanceof FetchFailureReason) {
+                return $this->failure($response);
             }
 
             $status = $response->getStatusCode();
 
             if (!\in_array($status, self::REDIRECTS, strict: true)) {
-                return $this->page($url, $response, $redirects, $json);
+                return $this->page($url, $response, $redirects, $accepts, $maxBytes);
             }
 
             if ($redirects >= $this->maxRedirects) {
-                return Result::err(error: FetchFailure::TooManyRedirects);
+                return $this->failure(FetchFailureReason::TooManyRedirects);
             }
 
             $next = UrlResolver::resolve(base: $url, reference: $response->getHeaderLine('Location'));
 
             if ($next === null) {
-                return Result::err(error: FetchFailure::InvalidRedirect);
+                return $this->failure(FetchFailureReason::InvalidRedirect);
             }
 
             $url = $next;
             ++$redirects;
         }
+    }
+
+    /**
+     * @return Result<FetchedPage, FetchFailure>
+     */
+    private function failure(FetchFailureReason $reason): Result
+    {
+        return Result::err(error: new FetchFailure($reason));
     }
 
     private function budgetSpent(int $startedAt): bool
@@ -170,12 +245,12 @@ final readonly class Fetcher
     /**
      * @param array<string, string> $headers
      */
-    private function send(string $url, string $host, bool $json, array $headers): ?ResponseInterface
+    private function send(string $url, string $host, string $accept, array $headers): ResponseInterface|FetchFailureReason
     {
         $request = $this->requestFactory
             ->createRequest(method: 'GET', uri: $url)
             ->withHeader('User-Agent', $this->userAgents->forHost($host))
-            ->withHeader('Accept', $json ? self::JSON_ACCEPT : self::HTML_ACCEPT);
+            ->withHeader('Accept', $accept);
 
         foreach ($headers as $name => $value) {
             $request = $request->withHeader($name, $value);
@@ -183,44 +258,49 @@ final readonly class Fetcher
 
         try {
             return $this->client->sendRequest($request);
+        } catch (NetworkExceptionInterface) {
+            return FetchFailureReason::Network;
         } catch (ClientExceptionInterface) {
-            return null;
+            return FetchFailureReason::ClientRefused;
         }
     }
 
     /**
      * @param non-empty-string $url
      * @param int<0, max> $redirects
+     * @param \Closure(string): bool $accepts
      *
      * @return Result<FetchedPage, FetchFailure>
      */
-    private function page(string $url, ResponseInterface $response, int $redirects, bool $json): Result
+    private function page(string $url, ResponseInterface $response, int $redirects, \Closure $accepts, int $maxBytes): Result
     {
-        if ($response->getStatusCode() < 200 || $response->getStatusCode() > 299) {
-            return Result::err(error: FetchFailure::HttpStatus);
+        $status = $response->getStatusCode();
+
+        if ($status < 200 || $status > 299) {
+            return Result::err(error: new FetchFailure(
+                reason: FetchFailureReason::HttpStatus,
+                status: $status >= 100 && $status <= 599 ? $status : null,
+                retryAfterSeconds: RetryAfter::seconds($response),
+            ));
         }
 
         $contentType = $response->getHeaderLine('Content-Type');
         $mediaType = strtolower(trim(explode(';', $contentType)[0]));
 
-        $accepted = $json
-            ? $mediaType === 'application/json' || str_ends_with($mediaType, '+json')
-            : \in_array($mediaType, self::HTML_TYPES, strict: true);
-
-        if (!$accepted) {
-            return Result::err(error: FetchFailure::NotHtml);
+        if (!$accepts($mediaType)) {
+            return $this->failure(FetchFailureReason::UnexpectedContentType);
         }
 
         $declared = $response->getHeaderLine('Content-Length');
 
-        if (preg_match('/\A\d+\z/', $declared) === 1 && (int) $declared > $this->maxBodyBytes) {
-            return Result::err(error: FetchFailure::TooLarge);
+        if (preg_match('/\A\d+\z/', $declared) === 1 && (int) $declared > $maxBytes) {
+            return $this->failure(FetchFailureReason::TooLarge);
         }
 
-        $body = $this->read($response);
+        $body = $this->read($response, $maxBytes);
 
         if ($body === null) {
-            return Result::err(error: FetchFailure::TooLarge);
+            return $this->failure(FetchFailureReason::TooLarge);
         }
 
         $charset = preg_match('/;\s*charset\s*=\s*"?([A-Za-z0-9._:-]+)/i', $contentType, $matches) === 1
@@ -236,7 +316,7 @@ final readonly class Fetcher
         ));
     }
 
-    private function read(ResponseInterface $response): ?string
+    private function read(ResponseInterface $response, int $maxBytes): ?string
     {
         $stream = $response->getBody();
         $body = '';
@@ -250,7 +330,7 @@ final readonly class Fetcher
 
             $body .= $chunk;
 
-            if (\strlen($body) > $this->maxBodyBytes) {
+            if (\strlen($body) > $maxBytes) {
                 return null;
             }
         }

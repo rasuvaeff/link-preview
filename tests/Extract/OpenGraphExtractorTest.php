@@ -106,6 +106,33 @@ final class OpenGraphExtractorTest
     /**
      * @return \Rasuvaeff\Result\Result<Metadata, ExtractFailure>
      */
+
+    public function readsTheImageDimensions(): void
+    {
+        $metadata = $this->extract('<meta property="og:image" content="/i.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630px">')->unwrap();
+
+        Assert::same([$metadata->imageWidth, $metadata->imageHeight], [1200, 630]);
+    }
+
+    public function dimensionsWithoutAnImageAreDropped(): void
+    {
+        $metadata = $this->extract('<meta property="og:title" content="T"><meta property="og:image" content="javascript:x"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">')->unwrap();
+
+        Assert::null($metadata->image);
+        Assert::null($metadata->imageWidth);
+        Assert::null($metadata->imageHeight);
+    }
+
+
+    public function everyImageCandidateIsTriedInOrder(): void
+    {
+        $secure = $this->extract('<meta property="og:image:secure_url" content="javascript:a"><meta property="og:image:secure_url" content="/secure.png"><meta property="og:image" content="/plain.png">')->unwrap();
+        $url = $this->extract('<meta property="og:image:url" content="javascript:a"><meta property="og:image:url" content="/url.png">')->unwrap();
+
+        Assert::same($secure->image, 'https://example.com/secure.png');
+        Assert::same($url->image, 'https://example.com/url.png');
+    }
+
     private function extract(string $html): \Rasuvaeff\Result\Result
     {
         return (new OpenGraphExtractor())->extract(document: PageDocument::parse($html), pageUrl: self::PAGE);

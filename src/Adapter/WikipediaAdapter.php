@@ -14,7 +14,7 @@ use Rasuvaeff\Result\Result;
  * Wikipedia articles through the REST summary API of their own language
  * edition (`/api/rest_v1/page/summary/<title>`). Needs nothing.
  *
- * @api
+ * @internal reached through {@see AdapterRegistry::standard()}
  */
 final readonly class WikipediaAdapter implements Adapter
 {
@@ -62,6 +62,7 @@ final readonly class WikipediaAdapter implements Adapter
             siteName: 'Wikipedia',
             language: Values::language(Json::string($data['lang'] ?? null)),
             type: 'article',
+            providerName: 'Wikipedia',
         ));
     }
 }

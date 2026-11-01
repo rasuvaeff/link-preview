@@ -9,7 +9,7 @@ use Rasuvaeff\Result\Result;
 /**
  * TikTok through its public oEmbed endpoint. Needs nothing.
  *
- * @api
+ * @internal reached through {@see AdapterRegistry::standard()}
  */
 final readonly class TikTokAdapter implements Adapter
 {
