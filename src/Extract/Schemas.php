@@ -7,11 +7,12 @@ namespace Rasuvaeff\LinkPreview\Extract;
 use Rasuvaeff\Result\Result;
 use Rasuvaeff\Schema\Schema;
 use Rasuvaeff\Schema\SchemaInterface;
+use Rasuvaeff\Schema\Unknown;
 
 /**
  * The shapes of the JSON answers the package reads, as `rasuvaeff/schema` schemas.
  *
- * Every schema is open (`additionalProperties: true`): services add fields all the time and
+ * Every schema is open (`Unknown::Passthrough`): services add fields all the time and
  * only the listed ones are read. Listed fields may be absent or `null`; a listed field of the
  * wrong type makes the whole answer unreadable, and {@see self::parse()} says where
  * (`$.thumbnail_url: ...`) without echoing a value. The same schema generates valid answers for
@@ -40,7 +41,7 @@ final readonly class Schemas
             'thumbnail_url' => self::text(),
             'url' => self::text(),
             'html' => self::text(),
-        ], additionalProperties: true);
+        ], unknown: Unknown::Passthrough);
     }
 
     /**
@@ -53,11 +54,11 @@ final readonly class Schemas
             'lang' => self::text(),
             'description' => self::text(),
             'extract' => self::text(),
-            'thumbnail' => Schema::object(['source' => self::text()], additionalProperties: true)->nullable()->optional(),
+            'thumbnail' => Schema::object(['source' => self::text()], unknown: Unknown::Passthrough)->nullable()->optional(),
             'content_urls' => Schema::object([
-                'desktop' => Schema::object(['page' => self::text()], additionalProperties: true)->nullable()->optional(),
-            ], additionalProperties: true)->nullable()->optional(),
-        ], additionalProperties: true);
+                'desktop' => Schema::object(['page' => self::text()], unknown: Unknown::Passthrough)->nullable()->optional(),
+            ], unknown: Unknown::Passthrough)->nullable()->optional(),
+        ], unknown: Unknown::Passthrough);
     }
 
     /**
@@ -72,8 +73,8 @@ final readonly class Schemas
             'created' => self::text(),
             'publication_ts' => self::text(),
             'embed_url' => self::text(),
-            'author' => Schema::object(['name' => self::text()], additionalProperties: true)->nullable()->optional(),
-        ], additionalProperties: true);
+            'author' => Schema::object(['name' => self::text()], unknown: Unknown::Passthrough)->nullable()->optional(),
+        ], unknown: Unknown::Passthrough);
     }
 
     /**

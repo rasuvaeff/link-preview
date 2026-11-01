@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.1.2 — 2026-11-01
+
+- Requires `rasuvaeff/schema` ^0.5: the open answer schemas are declared with
+  `unknown: Unknown::Passthrough` (was `additionalProperties: true`); parsing
+  and the parsed arrays are unchanged.
+- CI: the property regression corpus is restored before and saved after the
+  coverage run, so a falsified property replays on later runs.
+- Tests: the broken-markup fixture no longer puts a tag inside `<title>` —
+  libxml 2.14+ (the `ubuntu-26.04` runners) reads the title as RCDATA, as
+  HTML5 does, so the expected text depended on the libxml version; the
+  clipping property draws blank text as its own branch, so its 1% "blank"
+  coverage gate no longer flakes.
+
 ## 0.1.1 — 2026-10-23
 
 - DNS pinning is now `rasuvaeff/pinned-http-client` (suggested, dev-required for the example): `examples/with_pinned_client.php` feeds it the rules of `UrlPolicy`; README and agent skill point to it instead of a recipe.
