@@ -99,9 +99,12 @@ $failure->isTransient();     // retry later?
 ### Decorating
 
 ```php
+use Rasuvaeff\LinkPreview\CachedPreviewProvider; // PSR-16 (psr/simple-cache ^3.0, suggested)
 use Rasuvaeff\LinkPreview\LinkPreviewer; // preview(string $url): Result; fromHtml(string $html, string $pageUrl, ?string $charset = null): Result
 
-final class Cached implements LinkPreviewer { /* store $info->toArray(), read with PageInfo::fromArray(); do not cache transient failures */ }
+// Ships one decorator; cache only successes (toArray() shape), never failures:
+$cached = new CachedPreviewProvider($provider, $psr16Cache, ttlSeconds: 900); // null = backend default
+// key: 'rasuvaeff.link-preview.preview.' + xxh3 of the URL string as given; garbage value = miss; fromHtml() uncached.
 ```
 
 ### Limits (clean text)

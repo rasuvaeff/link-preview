@@ -81,7 +81,15 @@ Do not wrap `PinnedClient` in its `RedirectFollower`: the `Fetcher` follows redi
 
 The pipeline is `UrlPolicy` -> site adapter (YouTube, Wikipedia, ...) -> `Fetcher` (policy on every hop, size and content-type limits) -> `PageDocument` -> extractors -> fixed-priority merge -> `Limits` (clean text, bounds) -> `PageInfo`. Every stage returns a `Result`; nothing throws on bad input from a user or the network.
 
-`PreviewProvider` implements `LinkPreviewer` (`preview()`, `fromHtml()`). Depend on the interface to put a cache, a rate limit or a circuit breaker in front of it - [`examples/cached_previewer.php`](examples/cached_previewer.php) caches previews as `PageInfo::toArray()` and reads them back with `PageInfo::fromArray()`.
+`PreviewProvider` implements `LinkPreviewer` (`preview()`, `fromHtml()`). Depend on the interface to put a cache, a rate limit or a circuit breaker in front of it - the package ships one such decorator, `CachedPreviewProvider` (PSR-16, [`psr/simple-cache`](https://www.php-fig.org/psr/psr-16/) ^3.0, suggested - bring your own backend):
+
+```php
+use Rasuvaeff\LinkPreview\CachedPreviewProvider;
+
+$previewer = new CachedPreviewProvider($provider, $psr16Cache, ttlSeconds: 900); // null = the backend's default
+```
+
+Only successful previews are cached, as the `PageInfo::toArray()` shape read back through `PageInfo::fromArray()`. A failed fetch is **not** cached: a page that is down right now gets a fresh chance on the next call - the cache only ever shortens a wait, never lengthens one. `fromHtml()` passes through uncached (the document is already in hand). The key is a hash of the URL string exactly as passed to `preview()` (prefix `rasuvaeff.link-preview.preview.`), so two spellings of the same page are two keys until the TTL expires - normalise upstream if your callers are sloppy. A garbage cache value (wrong type or shape after a backend hiccup) is a miss, never an error, and is overwritten by the next successful preview. See [`examples/cached_previewer.php`](examples/cached_previewer.php).
 
 ### PageInfo
 

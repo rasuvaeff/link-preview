@@ -81,7 +81,15 @@ if ($result->isOk()) {
 
 Конвейер: `UrlPolicy` -> адаптер сайта (YouTube, Wikipedia, ...) -> `Fetcher` (политика на каждом хопе, лимиты размера и content-type) -> `PageDocument` -> экстракторы -> слияние по фиксированному приоритету -> `Limits` (чистый текст, границы) -> `PageInfo`. Каждый этап возвращает `Result`; на плохой ввод от пользователя или сети ничего не бросается.
 
-`PreviewProvider` реализует `LinkPreviewer` (`preview()`, `fromHtml()`). Зависьте от интерфейса, чтобы поставить перед ним кеш, rate limit или circuit breaker - [`examples/cached_previewer.php`](examples/cached_previewer.php) кеширует превью как `PageInfo::toArray()` и читает обратно через `PageInfo::fromArray()`.
+`PreviewProvider` реализует `LinkPreviewer` (`preview()`, `fromHtml()`). Зависьте от интерфейса, чтобы поставить перед ним кеш, rate limit или circuit breaker - пакет несёт один такой декоратор, `CachedPreviewProvider` (PSR-16, [`psr/simple-cache`](https://www.php-fig.org/psr/psr-16/) ^3.0, suggested - бэкенд любой):
+
+```php
+use Rasuvaeff\LinkPreview\CachedPreviewProvider;
+
+$previewer = new CachedPreviewProvider($provider, $psr16Cache, ttlSeconds: 900); // null = дефолт бэкенда
+```
+
+Кешируются только успешные превью - в форме `PageInfo::toArray()`, читаются обратно через `PageInfo::fromArray()`. Неудачный fetch **не** кешируется: страница, которая сейчас недоступна, на следующем вызове получает новый шанс - кеш может только сократить ожидание, но не удлинить его. `fromHtml()` проходит насквозь без кеша (документ уже в руках). Ключ - хеш строки URL ровно в том виде, в каком её передали в `preview()` (префикс `rasuvaeff.link-preview.preview.`), поэтому два написания одной страницы - два ключа до истечения TTL; нормализуйте URL выше по стеку, если ваши вызывающие пишут разно. Мусорное значение в кеше (не тот тип или форма после сбоя бэкенда) - промах, а не ошибка, и перезаписывается следующим успешным превью. См. [`examples/cached_previewer.php`](examples/cached_previewer.php).
 
 ### PageInfo
 
@@ -315,7 +323,7 @@ $provider = new PreviewProvider(
 | `redirects.php` | Цепочка редиректов, отвергнутая на втором хопе | Нет |
 | `limits_merge.php` | Приоритет источников, свой порядок и `Limits` | Нет |
 | `failures.php` | `PreviewFailure`: причина, статус, `Retry-After`, `isTransient()` | Нет |
-| `cached_previewer.php` | Кеширующий декоратор `LinkPreviewer` поверх `toArray()` / `fromArray()` | Нет |
+| `cached_previewer.php` | `CachedPreviewProvider` - штатный PSR-16-декоратор (успехи кешируются, неудачи нет) | Нет |
 | `media.php` | `Fetcher::fetchMedia()`: типы, лимит размера, политика на редиректах | Нет |
 | `adapters_oembed.php` | YouTube, TikTok, Twitter/X, Twitch по записанным ответам oEmbed | Нет |
 | `adapters_pages.php` | GitHub, Telegram, VK (теги страницы) и Wikipedia, Rutube (API) по записанным ответам | Нет |

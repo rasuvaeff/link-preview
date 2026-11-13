@@ -129,6 +129,11 @@ $stored = $info->toArray();  // PageInfo::fromArray($stored) reads it back
 No network for the page (tests, stored HTML): `$provider->fromHtml(html: $html, pageUrl: $url, charset: 'windows-1251')`;
 a `pageUrl` the policy refuses is `PolicyRejected`. Images: `$fetcher->fetchMedia(url: $info->image, acceptedTypes: ['image/*'], maxBytes: ...)`.
 
+Caching: `new CachedPreviewProvider($provider, $psr16Cache, ttlSeconds: 900)` - the shipped PSR-16
+decorator (`psr/simple-cache` ^3.0, suggested). Only successful previews are cached (the
+`toArray()` shape); a failed fetch is never cached; `fromHtml()` passes through uncached; a
+garbage cache value is a miss, never an error.
+
 ## Pitfalls
 
 - JSON answers are shape-checked internally (`rasuvaeff/schema` is an implementation detail, not
