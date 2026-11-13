@@ -104,7 +104,10 @@ use Rasuvaeff\LinkPreview\LinkPreviewer; // preview(string $url): Result; fromHt
 
 // Ships one decorator; cache only successes (toArray() shape), never failures:
 $cached = new CachedPreviewProvider($provider, $psr16Cache, ttlSeconds: 900); // null = backend default
-// key: 'rasuvaeff.link-preview.preview.' + xxh3 of the URL string as given; garbage value = miss; fromHtml() uncached.
+// key: 'rasuvaeff.link-preview.preview.' + xxh3 of cacheNamespace + URL string as given;
+// garbage value = miss; a throwing backend never fails the preview; fromHtml() uncached.
+// cacheNamespace (default 'preview') scopes keys: differently configured decorators must not share one;
+// the decorator re-checks no URL policy on a hit - wrap after the policy decision if it is caller-specific.
 ```
 
 ### Limits (clean text)

@@ -38,6 +38,11 @@ final class CachedPreviewProviderTest
         $this->fixture = new CachedPreviewProvider($this->inner, $this->cache, ttlSeconds: 60);
     }
 
+    private function keyFor(string $namespace, string $url): string
+    {
+        return 'rasuvaeff.link-preview.preview.' . hash('xxh3', $namespace . "\0" . $url);
+    }
+
     public function secondCallOfTheSameUrlDoesNotHitTheInnerPreviewer(): void
     {
         $first = $this->fixture->preview(self::URL_A)->unwrap();
@@ -100,7 +105,7 @@ final class CachedPreviewProviderTest
     #[DataProvider('garbageValueProvider')]
     public function garbageCacheValueIsAMissAndGetsOverwritten(mixed $garbage): void
     {
-        $key = 'rasuvaeff.link-preview.preview.' . hash('xxh3', self::URL_A);
+        $key = $this->keyFor('preview', self::URL_A);
         $this->cache->entries[$key] = [$garbage, null];
 
         $this->fixture->preview(self::URL_A);
@@ -133,7 +138,7 @@ final class CachedPreviewProviderTest
 
         $fixture->preview(self::URL_A);
 
-        Assert::same($this->cache->entries['rasuvaeff.link-preview.preview.' . hash('xxh3', self::URL_A)][1], null);
+        Assert::same($this->cache->entries[$this->keyFor('preview', self::URL_A)][1], null);
     }
 
     public function fromHtmlIsPassedThroughWithoutCaching(): void
@@ -144,5 +149,50 @@ final class CachedPreviewProviderTest
         Assert::same($this->inner->fromHtmlCalls, 2);
         Assert::same($this->cache->entries, []);
         Assert::same($second->unwrap()->toArray(), $first->unwrap()->toArray());
+    }
+
+    public function aCacheThatThrowsOnReadIsAMissNotAnError(): void
+    {
+        $this->cache->throwOnGet = true;
+
+        $first = $this->fixture->preview(self::URL_A);
+        $second = $this->fixture->preview(self::URL_A);
+
+        Assert::same($this->inner->previewCalls, 2, 'a broken cache read falls through to the inner previewer');
+        Assert::same($first->unwrap()->toArray(), $this->info->toArray());
+        Assert::same($second->unwrap()->toArray(), $this->info->toArray());
+    }
+
+    public function aCacheThatThrowsOnWriteDoesNotFailThePreview(): void
+    {
+        $this->cache->throwOnSet = true;
+
+        $result = $this->fixture->preview(self::URL_A);
+
+        Assert::same($result->unwrap()->toArray(), $this->info->toArray());
+        Assert::same($this->cache->entries, [], 'nothing was written, but the preview succeeded');
+    }
+
+    public function differentNamespacesUseDifferentKeys(): void
+    {
+        $other = new CachedPreviewProvider(new Support\CountingPreviewer(new PageInfo(url: self::URL_B, title: 'Other')), $this->cache, ttlSeconds: 60, cacheNamespace: 'strict');
+
+        $this->fixture->preview(self::URL_A);
+        $other->preview(self::URL_A);
+
+        Assert::same(count($this->cache->entries), 2);
+
+        $fromDefault = $this->fixture->preview(self::URL_A)->unwrap();
+        $fromOther = $other->preview(self::URL_A)->unwrap();
+
+        Assert::same($fromDefault->title, 'Cached & clean', 'the default namespace serves its own entry');
+        Assert::same($fromOther->title, 'Other', 'the other namespace does not see the default entry');
+    }
+
+    public function defaultNamespaceIsPreview(): void
+    {
+        $this->fixture->preview(self::URL_A);
+
+        Assert::true(isset($this->cache->entries[$this->keyFor('preview', self::URL_A)]));
     }
 }

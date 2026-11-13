@@ -7,6 +7,7 @@ namespace Rasuvaeff\LinkPreview;
 use InvalidArgumentException;
 use Psr\SimpleCache\CacheInterface;
 use Rasuvaeff\Result\Result;
+use Throwable;
 
 /**
  * PSR-16 cache decorator over any {@see LinkPreviewer} ({@see PreviewProvider}
@@ -18,14 +19,20 @@ use Rasuvaeff\Result\Result;
  * {@see PageInfo::fromArray()}, so any PSR-16 backend works (array, Redis, ...)
  * and an array stored by an older version still reads.
  *
- * Keys are dot-separated (PSR-16 reserves `{}()/\@:`) and hash the URL string
- * exactly as it was passed to {@see self::preview()}: two spellings of the
- * same page are two keys until the TTL expires, so normalise upstream if your
- * callers are sloppy. `null` TTL is the backend's default lifetime.
+ * Keys are dot-separated (PSR-16 reserves `{}()/\@:`) and hash the namespace
+ * and the URL string exactly as it was passed to {@see self::preview()}: two
+ * spellings of the same page are two keys until the TTL expires, so normalise
+ * upstream if your callers are sloppy. `null` TTL is the backend's default
+ * lifetime. The cache namespace (`cacheNamespace`, default `'preview'`) scopes
+ * entries: two decorators sharing one backend but configured differently
+ * (different providers, limits or policies) must use different namespaces, or
+ * one serves the other's cached previews.
  *
- * A garbage cache value (wrong type or wrong shape after a backend hiccup) is
- * a miss, never an error, and is overwritten by the next successful preview.
- * A failed cache write does not fail the preview.
+ * The cache is never a single point of failure: a backend that throws during
+ * a read is a miss, and one that throws during a write is skipped - the
+ * preview result from the inner previewer is returned either way. A garbage
+ * cache value (wrong type or wrong shape after a backend hiccup) is a miss,
+ * never an error, and is overwritten by the next successful preview.
  *
  * {@see self::fromHtml()} is passed through uncached: the document is already
  * in hand, so there is no fetch to save.
@@ -41,6 +48,7 @@ final readonly class CachedPreviewProvider implements LinkPreviewer
         private LinkPreviewer $inner,
         private CacheInterface $cache,
         private ?int $ttlSeconds = self::DEFAULT_TTL_SECONDS,
+        private string $cacheNamespace = 'preview',
     ) {
         if ($ttlSeconds !== null && $ttlSeconds <= 0) {
             throw new InvalidArgumentException('TTL must be positive');
@@ -51,13 +59,20 @@ final readonly class CachedPreviewProvider implements LinkPreviewer
     public function preview(string $url): Result
     {
         $key = $this->cacheKey($url);
-        /** @var mixed $cached */
-        $cached = $this->cache->get($key);
+
+        $cached = null;
+
+        try {
+            /** @var mixed $cached */
+            $cached = $this->cache->get($key);
+        } catch (Throwable) {
+            // A broken cache read is a miss: fall through and fetch.
+        }
 
         if (\is_array($cached)) {
             try {
                 return Result::ok(value: PageInfo::fromArray($cached));
-            } catch (InvalidArgumentException) {
+            } catch (InvalidArgumentException|\ValueError) {
                 // A wrong shape is a miss: fall through and re-fetch.
             }
         }
@@ -66,7 +81,11 @@ final readonly class CachedPreviewProvider implements LinkPreviewer
         $info = $result->value();
 
         if ($info instanceof PageInfo) {
-            $this->cache->set($key, $info->toArray(), $this->ttlSeconds);
+            try {
+                $this->cache->set($key, $info->toArray(), $this->ttlSeconds);
+            } catch (Throwable) {
+                // A broken cache write must not fail the preview.
+            }
         }
 
         return $result;
@@ -80,6 +99,6 @@ final readonly class CachedPreviewProvider implements LinkPreviewer
 
     private function cacheKey(string $url): string
     {
-        return self::CACHE_KEY_PREFIX . hash('xxh3', $url);
+        return self::CACHE_KEY_PREFIX . hash('xxh3', $this->cacheNamespace . "\0" . $url);
     }
 }

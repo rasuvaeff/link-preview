@@ -20,17 +20,23 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 
 final class ArrayCache implements CacheInterface
 {
-    /** @var array<string, mixed> */
+    /** @var array<string, array{mixed, int|null}> */
     public array $values = [];
 
     public function get(string $key, mixed $default = null): mixed
     {
-        return $this->values[$key] ?? $default;
+        $entry = $this->values[$key] ?? null;
+
+        if ($entry === null || ($entry[1] !== null && $entry[1] <= time())) {
+            return $default;
+        }
+
+        return $entry[0];
     }
 
     public function set(string $key, mixed $value, int|\DateInterval|null $ttl = null): bool
     {
-        $this->values[$key] = $value;
+        $this->values[$key] = [$value, \is_int($ttl) ? time() + $ttl : null];
 
         return true;
     }
@@ -76,7 +82,7 @@ final class ArrayCache implements CacheInterface
 
     public function has(string $key): bool
     {
-        return isset($this->values[$key]);
+        return $this->get($key) !== null;
     }
 }
 

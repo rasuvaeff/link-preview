@@ -6,6 +6,7 @@ namespace Rasuvaeff\LinkPreview\Tests\Support;
 
 use DateInterval;
 use Psr\SimpleCache\CacheInterface;
+use RuntimeException;
 
 /**
  * In-memory PSR-16 cache with a controllable clock, so a TTL test does not
@@ -17,12 +18,20 @@ final class ArrayCache implements CacheInterface
 {
     public int $now = 1_000;
 
+    public bool $throwOnGet = false;
+
+    public bool $throwOnSet = false;
+
     /** @var array<string, Entry> */
     public array $entries = [];
 
     #[\Override]
     public function get(string $key, mixed $default = null): mixed
     {
+        if ($this->throwOnGet) {
+            throw new RuntimeException('cache backend is down');
+        }
+
         $entry = $this->entries[$key] ?? null;
 
         if ($entry === null || ($entry[1] !== null && $entry[1] <= $this->now)) {
@@ -35,6 +44,10 @@ final class ArrayCache implements CacheInterface
     #[\Override]
     public function set(string $key, mixed $value, int|DateInterval|null $ttl = null): bool
     {
+        if ($this->throwOnSet) {
+            throw new RuntimeException('cache backend is down');
+        }
+
         $this->entries[$key] = [$value, \is_int($ttl) ? $this->now + $ttl : null];
 
         return true;

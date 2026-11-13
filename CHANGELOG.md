@@ -9,9 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added `CachedPreviewProvider`, a PSR-16 (`psr/simple-cache` ^3.0, suggested)
   decorator over any `LinkPreviewer`: successful previews are cached under a
-  hash of the URL (default TTL 1 h, configurable; `null` is the backend's
-  default), failed fetches are never cached, and `fromHtml()` passes through
-  uncached. A garbage cache value is a miss, never an error.
+  hash of the cache namespace and URL (default TTL 1 h, configurable; `null`
+  is the backend's default; `cacheNamespace` argument, default `'preview'`,
+  scopes entries so differently configured decorators can share a backend),
+  failed fetches are never cached, and `fromHtml()` passes through uncached.
+  A garbage cache value is a miss, never an error; a cache backend that
+  throws on read or write never fails the preview.
 - Mutation testing now counts uncovered code (`composer mutation` runs Infection
   with `--with-uncovered`). Tests name every class they exercise in `#[Covers]`,
   and new tests pin diagnostics, JSON-LD ranking and merging, HTML document
