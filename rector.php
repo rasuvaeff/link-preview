@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Rasuvaeff\RectorNamedLiterals\AddNameToLiteralArgumentRector;
 use Rector\Config\RectorConfig;
+use Rector\DeadCode\Rector\Property\RemoveUselessVarTagRector;
 
 return RectorConfig::configure()
     ->withPaths([
@@ -12,4 +13,9 @@ return RectorConfig::configure()
     ])
     ->withPhpSets(php83: true)
     ->withPreparedSets(deadCode: true, codeQuality: true)
+    ->withSkip([
+        // The `@var mixed $cached` on the PSR-16 get() assignment is required
+        // by psalm (MixedAssignment) — the documented rector<->psalm conflict.
+        RemoveUselessVarTagRector::class => [__DIR__ . '/src/CachedPreviewProvider.php'],
+    ])
     ->withRules([AddNameToLiteralArgumentRector::class]);

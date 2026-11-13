@@ -14,7 +14,7 @@ docker run --rm -v "$PWD":/app -w /app link-preview-php:local php examples/parse
 | `redirects.php` | A redirect chain refused on the second hop, with the requests actually sent | No |
 | `limits_merge.php` | Source priority, custom order and `Limits` on an inline document | No |
 | `failures.php` | `PreviewFailure`: reason, HTTP status, `Retry-After`, `isTransient()` for 404, 503, 429, network, policy | No |
-| `cached_previewer.php` | A caching `LinkPreviewer` decorator storing `PageInfo::toArray()`, reading `fromArray()` | No |
+| `cached_previewer.php` | `CachedPreviewProvider`, the shipped PSR-16 decorator (successes cached, failures not) | No |
 | `media.php` | `Fetcher::fetchMedia()`: accepted types, size limit, the policy on a redirect | No |
 | `adapters_oembed.php` | YouTube, TikTok, Twitter/X, Twitch from recorded oEmbed answers | No |
 | `adapters_pages.php` | GitHub, Telegram, VK (page tags) and Wikipedia, Rutube (APIs) from recorded answers | No |

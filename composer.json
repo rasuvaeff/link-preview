@@ -44,6 +44,7 @@
         "guzzlehttp/psr7": "^2.7",
         "infection/infection": "^0.35",
         "maglnet/composer-require-checker": "^4.17",
+        "psr/simple-cache": "^3.0",
         "rasuvaeff/pinned-http-client": "^1.0",
         "rasuvaeff/property-testing-testo": "^1.0",
         "rasuvaeff/rector-named-literals": "^1.0",
@@ -57,6 +58,7 @@
     },
     "suggest": {
         "guzzlehttp/guzzle": "A PSR-18 client + PSR-17 factories when not using rasuvaeff/pinned-http-client (alternatively symfony/http-client + nyholm/psr7)",
+        "psr/simple-cache": "^3.0 to enable CachedPreviewProvider, the PSR-16 decorator that caches successful previews",
         "rasuvaeff/pinned-http-client": "The recommended PSR-18 client for the Fetcher (^1.0): pins the connection to the addresses UrlPolicy::allowsAddress() accepts (DNS rebinding protection)"
     },
     "autoload": {

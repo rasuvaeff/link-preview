@@ -89,9 +89,11 @@ final readonly class PageInfo
      * The inverse of {@see self::toArray()}, for previews kept in a cache or a
      * database: `fromArray($info->toArray())->toArray() === $info->toArray()`.
      * Missing keys are `null` (an array stored by an older version still reads);
-     * unknown keys are ignored.
+     * unknown keys are ignored. A key only a backend hiccup could produce
+     * (not a string) is ignored the same way: field names are looked up, not
+     * trusted from the key space.
      *
-     * @param array<string, mixed> $data
+     * @param array<array-key, mixed> $data
      *
      * @throws InvalidArgumentException when a field has the wrong type or an invalid value
      */

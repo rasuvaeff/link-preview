@@ -1,5 +1,6 @@
 {
     "symbol-whitelist": [
+        "Psr\\SimpleCache\\CacheInterface",
         "Rasuvaeff\\PinnedHttpClient\\ResponseTooLarge"
     ],
     "php-core-extensions": [
