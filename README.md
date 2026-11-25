@@ -269,7 +269,7 @@ $provider = new PreviewProvider(
 
 An adapter answers `Result<Metadata, AdapterFailure>` and reaches the network only through its `AdapterContext` (`html()`, `json()` - the `Fetcher`, under the URL policy). JSON answers of oEmbed, Wikipedia and Rutube are checked against their shapes before they are read: a field of the wrong type makes the answer unreadable (`AdapterFailure::InvalidResponse`) and `AdapterContext::diagnostics()` says where (`oEmbed $.title: ...`) without echoing a value.
 
-Tokens are arguments of `standard()` (`#[\SensitiveParameter]`), travel as an `Authorization: Bearer` header to the API host only (a redirect to another host drops them) and never appear in a URL, a failure or an exception. Without a token, Instagram and Facebook answer `AdapterFailure::MissingToken` without making any request. `new AdapterRegistry()` turns adapters off.
+Tokens are arguments of `standard()` (`#[\SensitiveParameter]`), travel as an `Authorization: Bearer` header to the API origin only (a redirect to another scheme, host or port drops them) and never appear in a URL, a failure or an exception. Without a token, Instagram and Facebook answer `AdapterFailure::MissingToken` without making any request. `new AdapterRegistry()` turns adapters off.
 
 The fixtures behind the adapter tests are in `tests/fixtures/adapters/`: they are written from the services' documented response formats, not live recordings. `bin/record-preview-corpus --check` re-parses every committed entry (no network); `bin/record-preview-corpus --record=<name> --live` refreshes one entry's files from the real service, and `LINK_PREVIEW_LIVE=1 vendor/bin/testo --suite=Integration` compares the real services with what the code expects.
 

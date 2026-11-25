@@ -269,7 +269,7 @@ $provider = new PreviewProvider(
 
 Адаптер отвечает `Result<Metadata, AdapterFailure>` и выходит в сеть только через свой `AdapterContext` (`html()`, `json()` - это `Fetcher` под политикой URL). JSON-ответы oEmbed, Wikipedia и Rutube сверяются с их формой до чтения: поле неверного типа делает ответ нечитаемым (`AdapterFailure::InvalidResponse`), а `AdapterContext::diagnostics()` говорит где (`oEmbed $.title: ...`), не повторяя значение.
 
-Токены - аргументы `standard()` (`#[\SensitiveParameter]`), передаются заголовком `Authorization: Bearer` только хосту API (редирект на другой хост их отбрасывает) и никогда не попадают в URL, отказ или исключение. Без токена Instagram и Facebook отвечают `AdapterFailure::MissingToken`, не делая запросов. `new AdapterRegistry()` выключает адаптеры.
+Токены - аргументы `standard()` (`#[\SensitiveParameter]`), передаются заголовком `Authorization: Bearer` только источнику API (редирект на другую схему, хост или порт их отбрасывает) и никогда не попадают в URL, отказ или исключение. Без токена Instagram и Facebook отвечают `AdapterFailure::MissingToken`, не делая запросов. `new AdapterRegistry()` выключает адаптеры.
 
 Фикстуры тестов адаптеров лежат в `tests/fixtures/adapters/`: они написаны по документированным форматам ответов сервисов, а не записаны вживую. `bin/record-preview-corpus --check` заново разбирает каждую закоммиченную запись (без сети); `bin/record-preview-corpus --record=<name> --live` обновляет файлы одной записи с настоящего сервиса, а `LINK_PREVIEW_LIVE=1 vendor/bin/testo --suite=Integration` сверяет настоящие сервисы с тем, чего ждёт код.
 

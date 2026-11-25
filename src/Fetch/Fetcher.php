@@ -106,8 +106,8 @@ final readonly class Fetcher
      * Fetches a JSON document (`application/json` or any `+json` type) under
      * exactly the same policy, redirect and size rules as a page.
      *
-     * `$headers` (an API token, for instance) are sent to the host of the
-     * first URL only: a redirect to another host drops them, so a credential
+     * `$headers` (an API token, for instance) are sent to the origin
+     * (scheme, host, port) of the first URL only: a redirect to another one drops them, so a credential
      * cannot be handed to a third party by a `Location` header.
      *
      * @param array<string, string> $headers
@@ -194,13 +194,15 @@ final readonly class Fetcher
             $url = $checked->unwrap();
             $host = parse_url($url, PHP_URL_HOST);
             $host = \is_string($host) ? $host : '';
-            $origin ??= $host;
+            // the policy has dropped a default port, so a missing one is comparable as it is
+            $here = [parse_url($url, PHP_URL_SCHEME), $host, parse_url($url, PHP_URL_PORT)];
+            $origin ??= $here;
 
             if ($redirects > 0 && $this->budgetSpent($startedAt)) {
                 return $this->failure(FetchFailureReason::BudgetExceeded);
             }
 
-            $response = $this->send($url, $host, $accept, $host === $origin ? $headers : []);
+            $response = $this->send($url, $host, $accept, $here === $origin ? $headers : []);
 
             if ($response instanceof FetchFailureReason) {
                 return $this->failure($response);

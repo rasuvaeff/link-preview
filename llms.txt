@@ -138,7 +138,7 @@ IDN hosts are converted to ASCII. Names are never resolved. `allowedNetworks` (C
 
 ```php
 $page = $fetcher->fetch(url: 'https://example.com/');          // Result<FetchedPage, FetchFailure>; text/html, application/xhtml+xml
-$json = $fetcher->fetchJson(url: $api, headers: ['Authorization' => 'Bearer <token>']); // headers to the first host only
+$json = $fetcher->fetchJson(url: $api, headers: ['Authorization' => 'Bearer <token>']); // headers to the first origin (scheme, host, port) only
 $img = $fetcher->fetchMedia(url: $info->image, acceptedTypes: ['image/*', 'video/mp4'], maxBytes: 5_242_880); // own limit
 $fetcher->check(url: $url);                                    // Result<string, UrlRejection>
 // FetchedPage: url (final), body, contentType (lower-case, no params), charset, redirects

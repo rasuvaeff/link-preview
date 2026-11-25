@@ -50,7 +50,7 @@ final class AdapterContext
     }
 
     /**
-     * @param array<string, string> $headers sent to the host of `$url` only
+     * @param array<string, string> $headers sent to the origin (scheme, host, port) of `$url` only
      *
      * @return Result<FetchedPage, FetchFailure>
      */
