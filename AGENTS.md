@@ -24,7 +24,7 @@ step with the public API.
 1. **Verification is mandatory.** Never claim "done" without a fresh green
    `composer build`. "Should work" does not count.
 2. **No suppressions.** No `@psalm-suppress`, no baseline. Fix the root cause.
-3. **UrlPolicy is the SSRF boundary.** Adapters reach the network only through `AdapterContext`; hosts are matched by labels (`HostMatcher`), tokens are headers to the API host only and never in URLs, failures or docs (`'<token>'`). Every URL that is fetched - first, redirect target, media - goes through `UrlPolicy::check()` before a request is made; `allowsAddress()` must agree with `check()` (property-tested); never fetch around `Fetcher`, never weaken a range without a test, and never claim DNS-rebinding protection of the package itself (pure PSR-18 cannot pin; `rasuvaeff/pinned-http-client` can, and stays a suggest/dev dependency - `src/` must not name its classes).
+3. **UrlPolicy is the SSRF boundary.** Adapters reach the network only through `AdapterContext`; hosts are matched by labels (`HostMatcher`), tokens are headers to the API origin only (scheme, host, port; a redirect to another origin drops them) and never in URLs, failures or docs (`'<token>'`). Every URL that is fetched - first, redirect target, media - goes through `UrlPolicy::check()` before a request is made; `allowsAddress()` must agree with `check()` (property-tested); never fetch around `Fetcher`, never weaken a range without a test, and never claim DNS-rebinding protection of the package itself (pure PSR-18 cannot pin; `rasuvaeff/pinned-http-client` can, and stays a suggest/dev dependency - `src/` must not name its classes).
 4. **Preserve the public contract.** Update README + tests with any API change.
 
 ## Commands

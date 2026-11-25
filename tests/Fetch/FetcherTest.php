@@ -508,6 +508,27 @@ final class FetcherTest
         Assert::same($sent, ['Bearer secret', 'Bearer secret', '', 'Bearer secret']);
     }
 
+    #[DataProvider('otherOriginProvider')]
+    public function customHeadersAreDroppedForAnotherSchemeOrPort(string $target): void
+    {
+        $client = Http::client([
+            'https://api.example.com/x' => Http::redirect($target),
+            $target => Adapters::json('{}'),
+        ]);
+
+        (new Fetcher(client: $client, requestFactory: new HttpFactory(), policy: new UrlPolicy(allowedPorts: [80, 443, 8443])))
+            ->fetchJson(url: 'https://api.example.com/x', headers: ['Authorization' => 'Bearer secret']);
+
+        $sent = array_map(static fn($request): string => $request->getHeaderLine('Authorization'), Http::requests($client));
+        Assert::same($sent, ['Bearer secret', '']);
+    }
+
+    public static function otherOriginProvider(): iterable
+    {
+        yield 'scheme downgrade' => ['http://api.example.com/y'];
+        yield 'another port' => ['https://api.example.com:8443/y'];
+    }
+
     public function checkReturnsTheNormalisedUrl(): void
     {
         $fetcher = $this->fetcher(Http::client([]));
