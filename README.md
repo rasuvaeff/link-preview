@@ -301,7 +301,7 @@ A link preview fetches a URL chosen by a user from inside your network. What the
 - Response size is bounded; only the content types asked for are read.
 - Every URL taken from the page is absolute http(s) without credentials. An oEmbed endpoint named by a page is fetched under the same policy and redirect checks as the page; a JSON-LD `@context` is never fetched.
 - `url` is always where the preview was fetched from; what the page claims (`og:url`, canonical) is kept apart in `canonicalUrl`, so a page cannot make a card point elsewhere.
-- Adapter hosts are matched by labels, not substrings; adapter tokens are sent as headers to the API host only and never appear in URLs, failures or exceptions.
+- Adapter hosts are matched by labels, not substrings; adapter tokens are sent as headers to the API origin only (a redirect to another scheme, host or port drops them) and never appear in URLs, failures or exceptions.
 
 What it cannot do, because PSR-18 does not give it the means:
 

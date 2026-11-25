@@ -18,7 +18,7 @@ composer require rasuvaeff/pinned-http-client    # recommended PSR-18 client (DN
 - Failures are value objects: `PreviewFailure` / `FetchFailure` with `reason` enum, `status`, `retryAfterSeconds`, `isTransient()`
 - Source priority per field: site adapter > oEmbed (discovered) > JSON-LD > OpenGraph > Twitter Cards > HTML; image + its width/height merge as one field
 - Built-in adapters are internal: `AdapterRegistry::standard(...)`, custom ones first via `->with(...)`
-- Adapter tokens (Instagram, Facebook required; Twitter optional) are `standard()` args, sent as Authorization headers to the API host only, never in URLs; no token = AdapterFailure::MissingToken, no request
+- Adapter tokens (Instagram, Facebook required; Twitter optional) are `standard()` args, sent as Authorization headers to the API origin only (scheme, host, port; a redirect to another origin drops them), never in URLs; no token = AdapterFailure::MissingToken, no request
 - Namespace `Rasuvaeff\LinkPreview`
 
 ## Quickstart

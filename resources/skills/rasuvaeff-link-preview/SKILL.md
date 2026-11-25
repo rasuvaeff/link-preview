@@ -68,9 +68,10 @@ Cards and plain-HTML metadata. Namespace `Rasuvaeff\LinkPreview\`.
 
 8. **Tokens (Instagram/Facebook required, Twitter optional)** are constructor
    arguments marked `#[\SensitiveParameter]`, sent as an `Authorization`
-   header to the API host only, never placed in a URL, a failure, an
-   exception, a log or a README example (use `'<token>'`). Without a token the
-   adapter answers `AdapterFailure::MissingToken` and makes no request.
+   header to the API origin only (scheme, host, port; a redirect to another
+   origin drops it), never placed in a URL, a failure, an exception, a log or
+   a README example (use `'<token>'`). Without a token the adapter answers
+   `AdapterFailure::MissingToken` and makes no request.
 
 9. **Do not log or display secrets.** URLs may carry tokens in the query
    string; redact query and fragment before logging, metrics or error reports.

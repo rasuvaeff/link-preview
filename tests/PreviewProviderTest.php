@@ -126,21 +126,27 @@ final class PreviewProviderTest
         Assert::same($info->url, 'https://example.com/x?y=1');
     }
 
+    /**
+     * @param \Closure(): ClientInterface $client built in the test: understudy-testo refuses a double made in a data provider
+     */
     #[DataProvider('failureProvider')]
-    public function fetchFailuresAreReported(string $url, ClientInterface $client, PreviewFailureReason $expected): void
+    public function fetchFailuresAreReported(string $url, \Closure $client, PreviewFailureReason $expected): void
     {
-        Assert::same($this->provider($client)->preview(url: $url)->error()?->reason, $expected);
+        Assert::same($this->provider($client())->preview(url: $url)->error()?->reason, $expected);
     }
 
+    /**
+     * @return iterable<string, array{string, \Closure(): ClientInterface, PreviewFailureReason}>
+     */
     public static function failureProvider(): iterable
     {
-        yield 'policy' => ['http://127.0.0.1/', Http::client([]), PreviewFailureReason::PolicyRejected];
-        yield 'network' => ['https://example.com/', Http::failing(), PreviewFailureReason::Network];
-        yield 'refused by the client' => ['https://example.com/', Http::refusing(), PreviewFailureReason::ClientRefused];
-        yield 'unexpected content type' => ['https://example.com/', Http::client(['https://example.com/' => new Response(200, ['Content-Type' => 'image/png'], 'x')]), PreviewFailureReason::UnexpectedContentType];
-        yield 'status' => ['https://example.com/', Http::client(['https://example.com/' => Http::html('x', status: 404)]), PreviewFailureReason::HttpStatus];
-        yield 'redirect loop' => ['https://example.com/', Http::client(['https://example.com/' => Http::redirect('/')]), PreviewFailureReason::TooManyRedirects];
-        yield 'redirect into the intranet' => ['https://example.com/', Http::client(['https://example.com/' => Http::redirect('http://10.0.0.1/')]), PreviewFailureReason::PolicyRejected];
+        yield 'policy' => ['http://127.0.0.1/', static fn(): ClientInterface => Http::client([]), PreviewFailureReason::PolicyRejected];
+        yield 'network' => ['https://example.com/', Http::failing(...), PreviewFailureReason::Network];
+        yield 'refused by the client' => ['https://example.com/', Http::refusing(...), PreviewFailureReason::ClientRefused];
+        yield 'unexpected content type' => ['https://example.com/', static fn(): ClientInterface => Http::client(['https://example.com/' => new Response(200, ['Content-Type' => 'image/png'], 'x')]), PreviewFailureReason::UnexpectedContentType];
+        yield 'status' => ['https://example.com/', static fn(): ClientInterface => Http::client(['https://example.com/' => Http::html('x', status: 404)]), PreviewFailureReason::HttpStatus];
+        yield 'redirect loop' => ['https://example.com/', static fn(): ClientInterface => Http::client(['https://example.com/' => Http::redirect('/')]), PreviewFailureReason::TooManyRedirects];
+        yield 'redirect into the intranet' => ['https://example.com/', static fn(): ClientInterface => Http::client(['https://example.com/' => Http::redirect('http://10.0.0.1/')]), PreviewFailureReason::PolicyRejected];
     }
 
     public function aStatusFailureKeepsTheStatusAndRetryAfter(): void
